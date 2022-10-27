@@ -100,7 +100,7 @@ def handleCliente(conn, addr):
 
 ########## MAIN ##########
 if len(sys.argv) == 1:
-    PORT = 5050 #sys.argv[1]
+    PORT = 5050 # sys.argv[1]
     ADDR = (SERVER, int(PORT))
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
