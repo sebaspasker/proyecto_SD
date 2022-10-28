@@ -1,6 +1,6 @@
-from .exceptions.out_of_range_exception import OutOfRangeException
-from .exceptions.not_player_exception import NotPlayerException
-from .Player import *
+from exceptions.out_of_range_exception import OutOfRangeException
+from exceptions.not_player_exception import NotPlayerException
+from Player import *
 
 # types = {
 #     "player" : Player(),
@@ -54,7 +54,7 @@ class Map:
         """
         Evaluates the matrix position, returning a string of the object
         """
-        return dict_position(self.get_map_matrix(position[0], position[1]))
+        return dict_positions[self.get_map_matrix(position[0], position[1])]
 
     def evaluate_fight(self, old_position, new_position, player1, player2):
         """
@@ -67,7 +67,7 @@ class Map:
             nothing happens.
         """
 
-        winner = player.fight()
+        winner = player1.fight(player2)
         if winner == 1:
             # Player who whe fight is dead
             player2.set_dead(True)
@@ -118,34 +118,36 @@ class Map:
     def evaluate_move(self, old_position, new_position):
         # TODO test
         # See if old position is a player
-        if evaluate_position(old_position) is not "Player":
+        if self.evaluate_position(old_position) != "Player":
             raise NotPlayerException("Position should be a player")
         else:
             player = self.get_map_class(old_position[0], old_position[1])
 
         # Evaluate what is in the new position
-        new_position_class = evaluate_position(new_position)
+        new_position_class = self.evaluate_position(new_position)
 
         # If in the new position there is a player or NPC,
         # they fight
-        if new_position_class is "Player" or new_position_class is "NPC":
+        if new_position_class == "Player" or new_position_class == "NPC":
             # TODO Test
             self.evaluate_fight(old_position, new_position, player, new_position_class)
-        elif new_position_class is "Mine":
+        elif new_position_class == "Mine":
             self.evaluate_mine(old_position, new_position, player, new_position_class)
-        elif new_position_class is "Food":
+        elif new_position_class == "Food":
             self.evaluate_food(old_position, new_position, player, new_position_class)
-        elif new_position_class is "None":
+        elif new_position_class == "None":
             # Moves player
             player.set_position(new_position[0], new_position[1])
             self.set_map(old_position[0], old_position[1], 0, None)
             self.set_map(new_position[0], new_position[1], 1, player)
 
-        if get_city(old_position) is not get_city(new_position):
+        if get_city(old_position) != get_city(new_position):
             # TODO
             # Mirar la temperatura del servidor de temperatura y evaluar en base a
             # ello el jugador
             pass
+
+        print(self.get_map_matrix)
 
     # SETTERS
     def set_map_matrix(self, x, y, num):
@@ -180,3 +182,12 @@ class Map:
             return self.map_class[x][y]
         else:
             raise OutOfRangeException("Range should be between 0 and 19")
+
+
+map_class = Map()
+player_class = Player()
+oponent_class = Player()
+
+map_class.set_map(0, 0, 1, player_class)
+map_class.set_map(0, 1, 1, oponent_class)
+map_class.evaluate_move((0, 0), (0, 1))

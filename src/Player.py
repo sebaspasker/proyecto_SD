@@ -1,7 +1,7 @@
 # TODO Search correct exception route
-from .exceptions.none_value_exception import NoneValueException
-from .exceptions.incorrect_format import IncorrectFormatException
-from .exceptions.out_of_range_exception import OutOfRangeException
+from exceptions.none_value_exception import NoneValueException
+from exceptions.incorrect_format import IncorrectFormatException
+from exceptions.out_of_range_exception import OutOfRangeException
 
 
 def fight(player_1, player_2):
