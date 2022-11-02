@@ -54,14 +54,17 @@ class Map:
     map_matrix = []
     map_class = []
 
-    def __init__(self):
-        self.map_matrix = [
-            [
-                " " if randint(0, 10) <= 6 else ["M", "F"][randint(0, 1)]
-                for i in range(0, 20)
+    def __init__(self, map_string=None):
+        if map_string is None:
+            self.map_matrix = [
+                [
+                    " " if randint(0, 10) <= 6 else ["M", "F"][randint(0, 1)]
+                    for i in range(0, 20)
+                ]
+                for j in range(0, 20)
             ]
-            for j in range(0, 20)
-        ]
+        else:
+            self.raw_string_to_matrix(map_string)
         self.map_class = [[None for i in range(0, 20)] for j in range(0, 20)]
 
     def __str__(self):
@@ -72,13 +75,40 @@ class Map:
             else:
                 map_str += "{} ".format(i)
 
-            for j in range(0, 20):
+            for j in range(0, 2):
                 map_str += " {} |".format(self.map_matrix[i][j])
             map_str += "\n"
 
         return map_str
 
+    def raw_string_to_matrix(self, map_string):
+        """
+        Converts a raw varchar(400) in the map_matrix.
+        """
+        if len(map_string) < 400:
+            raise OutOfRangeException("Debería de ser 400 carácteres.")
+
+        for i in range(0, 20):
+            row = []
+            for j in range(0, 20):
+                x = i * j
+                row.append(map_string[x])
+            self.map_matrix.append(row.copy())
+
+    def to_raw_string(self):
+        """
+        Converts the map_matrix to a raw string.
+        """
+        return_string = ""
+        for row in self.map_matrix:
+            for x in row:
+                return_string += x
+        return return_string
+
     def print_color(self):
+        """
+        Prints the map_matrix in color.
+        """
         map_string = self.__str__()
         for char in map_string:
             if char >= "0" and char <= "9":

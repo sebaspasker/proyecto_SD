@@ -18,6 +18,7 @@ def connect_db(name=None):
 
 
 def start_game():
+    global map_engine
     map_engine = Map()
 
     connection = sqlite3.connect("againstall.db")
@@ -28,15 +29,29 @@ def start_game():
 
     map_engine.distribute_ids(id_rows)
 
-    map_engine.print_color()
+    # map_engine.print_color()
+
+    cursor.execute("delete from map_engine;")
+    connection.commit()
+    cursor.execute(
+        "insert into map_engine(map) values('{}')".format(map_engine.to_raw_string())
+    )
+
+    connection.commit()
+    connection.close()
 
 
-def read_map(server):
-    global map
-
+def read_map(server=None):
+    global map_read
     try:
-        # TODO
-        pass
+        cursor = connect_db(server)
+
+        cursor.execute("select * from map_engine")
+
+        map_str = cursor.fetchone()[1]
+
+        map_read = Map(map_str)
+
     except ValueError as VE:
         print("VALUE ERROR: Cerrando engine...")
         print("{}".format(VE.message))
@@ -75,3 +90,4 @@ def send_map(server):
 #     )
 
 start_game()
+read_map()

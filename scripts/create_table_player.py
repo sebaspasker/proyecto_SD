@@ -24,14 +24,24 @@ table_alias = """
                 foreign key (alias) references players(alias)
             );"""
 
+table_map = """
+CREATE TABLE map_engine(
+    id integer primary key autoincrement not null,
+    map varchar(400) not null
+    );
+"""
+
 cursor.execute(table_p)
 cursor.execute(table_alias)
+cursor.execute(table_map)
 cursor.execute("INSERT INTO players values ('Jesus', '123', 1, 1, 0, 0, 0, 0)")
 cursor.execute("INSERT INTO players values ('Sebas', '123', 2, 1, 0, 0, 0, 0)")
 cursor.execute("INSERT INTO player_id(alias, active) values('Jesus', 1)")
 cursor.execute("INSERT INTO player_id(alias, active) values('Sebas', 1)")
+cursor.execute("INSERT INTO map_engine(map) values('Holaaa')")
 
 print("TABLE CREATED: {}".format(table_p))
 print("TABLE CREATED: {}".format(table_alias))
+print("TABLE CREATED: {}".format(table_map))
 connection.commit()
 connection.close()
