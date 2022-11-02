@@ -1,5 +1,5 @@
 import socket
-from sqlite3.dbapi2 import Error 
+from sqlite3.dbapi2 import Error
 import threading
 import sys
 from typing import List
@@ -8,8 +8,8 @@ import sqlite3
 
 # Variables globales constantes
 HEADER = 64
-SERVER = '127.0.0.3'
-FORMAT = 'utf-8'
+SERVER = "127.0.0.3"
+FORMAT = "utf-8"
 FIN = "FIN"
 
 
@@ -17,13 +17,19 @@ FIN = "FIN"
 def crearPerfil(lista: List, conn):
     try:
         # Conexión a la bd
-        connection = sqlite3.connect('againstall.db')
+        connection = sqlite3.connect("againstall.db")
 
         # Cursor para realizar los comandos de la bd
         cursor = connection.cursor()
 
         # Comando para insertar el jugador en la bd
-        command = "Insert into players values('" + lista[1] + "', '" + lista[2] + "', 1, 0, 0)"
+        command = (
+            "Insert into players values('"
+            + lista[1]
+            + "', '"
+            + lista[2]
+            + "', 1, 0, 0)"
+        )
         cursor.execute(command)
 
         conn.send("Perfil creado con éxito.".encode(FORMAT))
@@ -37,22 +43,25 @@ def crearPerfil(lista: List, conn):
         connection.close()
 
 
-
 # Función para cambiar la contraseña a un jugador
 def editarPerfil(lista: List, conn):
     try:
         # Conexión a la bd
-        connection = sqlite3.connect('againstall.db')
+        connection = sqlite3.connect("againstall.db")
 
         # Cursor para realizar los comandos de la bd
         cursor = connection.cursor()
 
         # Comando para cambiar la contraseña al jugador
-        command = "Update players set pass='" + lista[2] + "' WHERE alias='" + lista[1] + "'"
+        command = (
+            "Update players set pass='" + lista[2] + "' WHERE alias='" + lista[1] + "'"
+        )
         cursor.execute(command)
-        
+
         if cursor.rowcount == 0:
-            conn.send("No se ha encontrado el alias en la base de datos.".encode(FORMAT))
+            conn.send(
+                "No se ha encontrado el alias en la base de datos.".encode(FORMAT)
+            )
         else:
             conn.send("Perfil editado con éxito.".encode(FORMAT))
 
@@ -64,7 +73,7 @@ def editarPerfil(lista: List, conn):
     finally:
         cursor.close()
         connection.close()
-        
+
 
 # Función para manejar el mensaje del cliente que se conecta
 def handleCliente(conn, addr):
@@ -79,28 +88,28 @@ def handleCliente(conn, addr):
 
             # Recibo un mensaje del cliente
             print(f" He recibido del cliente [{addr}] el mensaje: {msg}")
-            
+
             # Lo separo en una lista para poder usarlo más fácilmente
             lista = msg.split(",")
-            
-            if lista[0] == '1': 
+
+            if lista[0] == "1":
                 if len(lista) == 3:
                     crearPerfil(lista, conn)
                 else:
                     conn.send("Error".encode(FORMAT))
-            elif lista[0] == '2':
+            elif lista[0] == "2":
                 if len(lista) == 3:
                     editarPerfil(lista, conn)
                 else:
                     conn.send("Error".encode(FORMAT))
- 
+
         connected = False
         conn.close()
 
 
 ########## MAIN ##########
 if len(sys.argv) == 1:
-    PORT = 5050 # sys.argv[1]
+    PORT = 5050  # sys.argv[1]
     ADDR = (SERVER, int(PORT))
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

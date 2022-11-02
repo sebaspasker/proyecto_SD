@@ -92,25 +92,25 @@ def editarPerfil(ip, puerto):
     client.close()
 
 
-def login(kafka_server, login, alias, id_player):
+def login(engine_ip, engine_port):
     """
     Function for user login inside the MMO game.
     """
 
-    Producer = KafkaProducer(bootstrap_server=kafka_server)
-    Consumer = KafkaConsumer("login_topic", bootstrap_server=kafka_server)
+    engine_addr = (engine_ip, int(engine_port))
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect(engine_addr)
 
-    if not login:
-        print(
-            "Bienvenido, a continuación va a proceder a loguearse. Introduzca los siguientes datos..."
-        )
-        print("Alias:")
-        alias = input()
+    print(
+        "Bienvenido, a continuación va a proceder a loguearse. Introduzca los siguientes datos..."
+    )
+    print("Alias:")
+    alias = input()
 
-        print("Password")
-        passwd = getpass()
+    print("Password")
+    passwd = getpass()
 
-        Producer.send("3", str(alias + " " + passwd).encode(FORMAT))
+    send("3," + alias + "," + passwd, clien)
 
 
 ########## MAIN ##########
