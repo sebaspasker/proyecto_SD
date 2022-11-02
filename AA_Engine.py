@@ -2,6 +2,7 @@ import socket
 import sqlite3
 import sys
 from src.Map import Map
+from src.Player import Player
 from kafka import KafkaProducer, KafkaConsumer
 
 FORMAT = "utf-8"
@@ -36,8 +37,7 @@ def start_game():
     global map_engine
     map_engine = Map()
 
-    connection = sqlite3.connect("againstall.db")
-    cursor = connection.cursor()
+    cursor = connect_db()
 
     command = "select * from player_id;"
     id_rows = cursor.execute(command).fetchall()
@@ -70,6 +70,11 @@ def read_map(ddbb_server=None):
         map_str = cursor.fetchone()[1]
 
         map_read = Map(map_str)
+        print(
+            "[READING MAP] Reading map from database {} and saved in map_read.".format(
+                DB_SERVER
+            )
+        )
 
     except ValueError as VE:
         print("VALUE ERROR: Cerrando engine...")
@@ -91,8 +96,10 @@ def recieve_map(server):
             map_str += message
 
         map_rec = Map(map_str)
+        print(
+            "[RECIEVING MAP] Recieved map raw char in topic '{}'".format("map_engine")
+        )
 
-        print(map_rec)
     except ValuerError as VE:
         print("VALUE ERROR: Cerrando engine...")
         print("{}".format(VE.message))
@@ -104,6 +111,26 @@ def resolve_user(server):
     pass
 
 
+def read_client(alias, passwd) -> Player:
+    cursor = connect_db()
+    if len(alias) <= 10 and len(passwd) <= 10:
+        player_string = cursor.execute(
+            "select * from players where alias = '{}' and passwd = '{}'"
+        ).fetchone()
+
+        if player_string:
+            if player_string[0] == alias and player_string[1] == passwd:
+                player = Player(player_string)
+                return player
+            else:
+                # TODO Devolver error
+                pass
+    else:
+        # TODO Devolver error
+        pass
+    return None
+
+
 def send_map(server):
     """
     Sends a map with kafka to 'map_engine' topic.
@@ -113,6 +140,7 @@ def send_map(server):
     try:
         producer = KafkaProducer(bootstrap_servers=server)
 
+        print("[SENDING MAP] Sending map raw char to topic '{}'".format("map_engine"))
         producer.send("map_engine", bytes(map_read.to_raw_string(), "utf-8"))
     except ValueError as VE:
         print("VALUE ERROR: Cerrando engine...")
@@ -130,6 +158,10 @@ def handle_client(connection, address):
         if msg_length:
             msg_length = int(msg_length)
             msg = conn.recv(msg_length).decode(FORMAT)
+
+            params_msg = msg.split(",")
+            if params_msg[0] == "3":
+                pass
 
 
 ########## MAIN ##########

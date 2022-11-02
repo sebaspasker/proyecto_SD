@@ -24,13 +24,20 @@ def fight(player_1, player_2):
 
 
 class Player:
-    def __init__(self):
-        self.position = (1, 1)
-        self.alias = ""
-        self.level = 0
-        self.cold = 0
-        self.hot = 0
-        self.dead = False
+    self.position = (1, 1)
+    self.alias = ""
+    self.level = 0
+    self.cold = 0
+    self.hot = 0
+    self.dead = False
+
+    def __init__(self, string_list=None):
+        if string_list is not None:
+            self.set_position(string_list[0], string_list[1])
+            self.set_level(string_list[2])
+            self.set_cold(string_list[3])
+            self.set_hot(string_list[4])
+            self.set_dead(string_list[5])
 
     def fight(self, player_2):
         """
