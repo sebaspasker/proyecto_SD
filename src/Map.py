@@ -1,6 +1,12 @@
-from exceptions.out_of_range_exception import OutOfRangeException
-from exceptions.not_player_exception import NotPlayerException
-from Player import *
+from .exceptions.out_of_range_exception import OutOfRangeException
+from .exceptions.not_player_exception import NotPlayerException
+from .utils.Colors import *
+from random import choices, randint
+from .Player import *
+
+import sys
+
+# sys.path.append("../")
 
 # types = {
 #     "player" : Player(),
@@ -8,6 +14,7 @@ from Player import *
 # }
 
 
+@DeprecationWarning
 def get_city(position):
     if position[0] <= 9 and position[1] <= 9:
         return "Londres"
@@ -26,12 +33,13 @@ class Position:
     type_m = ""
 
 
+# TODO Cambiar a jugadores y NPC ids
 dict_positions = {
-    0: "None",
-    1: "Player",
-    2: "NPC",
-    3: "Mine",
-    4: "Food",
+    " ": "None",
+    "P": "Player",
+    "N": "NPC",
+    "M": "Mine",
+    "F": "Food",
 }
 
 
@@ -47,8 +55,55 @@ class Map:
     map_class = []
 
     def __init__(self):
-        self.map_matrix = [[0 for i in range(0, 20)] for j in range(0, 20)]
+        self.map_matrix = [
+            [
+                " " if randint(0, 10) <= 6 else ["M", "F"][randint(0, 1)]
+                for i in range(0, 20)
+            ]
+            for j in range(0, 20)
+        ]
         self.map_class = [[None for i in range(0, 20)] for j in range(0, 20)]
+
+    def __str__(self):
+        map_str = "    1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16  17  18  19  20\n"
+        for i in range(0, 20):
+            if i <= 9:
+                map_str += "{}  ".format(i)
+            else:
+                map_str += "{} ".format(i)
+
+            for j in range(0, 20):
+                map_str += " {} |".format(self.map_matrix[i][j])
+            map_str += "\n"
+
+        return map_str
+
+    def print_color(self):
+        map_string = self.__str__()
+        for char in map_string:
+            if char >= "0" and char <= "9":
+                prYellow(char)
+            elif char == "M":
+                prRed(char)
+            elif char == "F":
+                prLightPurple(char)
+            else:
+                print(char, end="")
+
+    def distribute_ids(self, list_ids):
+        """
+        Distribute the active players ids around the map.
+
+        Input: (player_id, alias, active)
+        """
+
+        for id_player, alias, active in list_ids:
+            while True:
+                x = randint(0, 19)
+                y = randint(0, 19)
+                if self.get_map_matrix(x, y) == " " and active:
+                    break
+            self.set_map_matrix(x, y, str(id_player))
 
     def evaluate_position(self, position):
         """
@@ -150,11 +205,8 @@ class Map:
         print(self.get_map_matrix)
 
     # SETTERS
-    def set_map_matrix(self, x, y, num):
-        if in_map_range(x, y) and num >= 0 and num <= 4:
-            self.map_matrix[x][y] = num
-        else:
-            raise OutOfRangeException("Range should be between 0 and 19")
+    def set_map_matrix(self, x, y, char):
+        self.map_matrix[x][y] = char
 
     def set_map_class(self, x, y, obj):
         if in_map_range(x, y):
@@ -184,10 +236,11 @@ class Map:
             raise OutOfRangeException("Range should be between 0 and 19")
 
 
-map_class = Map()
-player_class = Player()
-oponent_class = Player()
+# map_class = Map()
+# print(map_class)
+# player_class = Player()
+# oponent_class = Player()
 
-map_class.set_map(0, 0, 1, player_class)
-map_class.set_map(0, 1, 1, oponent_class)
-map_class.evaluate_move((0, 0), (0, 1))
+# map_class.set_map(0, 0, 1, player_class)
+# map_class.set_map(0, 1, 1, oponent_class)
+# map_class.evaluate_move((0, 0), (0, 1))

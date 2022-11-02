@@ -1,10 +1,11 @@
 import sqlite3
 
-connection = sqlite3.connect("../againstall.db")
+connection = sqlite3.connect("./againstall.db")
 cursor = connection.cursor()
 cursor.execute("DROP TABLE IF EXISTS players")
+cursor.execute("DROP TABLE IF EXISTS player_id")
 
-table = """ CREATE TABLE players(
+table_p = """ CREATE TABLE players(
             alias text primary key,
 			pass text not null,
 			x integer,
@@ -15,10 +16,22 @@ table = """ CREATE TABLE players(
 			dead integer
 		);"""
 
-cursor.execute(table)
+table_alias = """
+            CREATE TABLE player_id(
+                id integer primary key autoincrement not null,
+                alias text unique,
+                active boolean not null,
+                foreign key (alias) references players(alias)
+            );"""
+
+cursor.execute(table_p)
+cursor.execute(table_alias)
 cursor.execute("INSERT INTO players values ('Jesus', '123', 1, 1, 0, 0, 0, 0)")
 cursor.execute("INSERT INTO players values ('Sebas', '123', 2, 1, 0, 0, 0, 0)")
+cursor.execute("INSERT INTO player_id(alias, active) values('Jesus', 1)")
+cursor.execute("INSERT INTO player_id(alias, active) values('Sebas', 1)")
 
-print("TABLE CREATED: {}".format(table))
+print("TABLE CREATED: {}".format(table_p))
+print("TABLE CREATED: {}".format(table_alias))
 connection.commit()
 connection.close()
