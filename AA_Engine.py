@@ -4,9 +4,17 @@ import sys
 from src.Map import Map
 from kafka import KafkaProducer, KafkaConsumer
 
+NAME_DB = "againstall.db"
 
 sys.path.append("src")
 sys.path.append("src/exceptions")
+
+
+def connect_db(name=None):
+    if name is None:
+        return sqlite3.connect(NAME_DB).cursor()
+    else:
+        return sqlite3.connect(name).cursor()
 
 
 def start_game():
@@ -21,6 +29,19 @@ def start_game():
     map_engine.distribute_ids(id_rows)
 
     map_engine.print_color()
+
+
+def read_map(server):
+    global map
+
+    try:
+        # TODO
+        pass
+    except ValueError as VE:
+        print("VALUE ERROR: Cerrando engine...")
+        print("{}".format(VE.message))
+    except KeyboardInterrupt:
+        print("Keyboard Interruption: Cerrando engine...")
 
 
 def send_map(server):
