@@ -1,8 +1,10 @@
 import socket
 import sqlite3
 import sys
+import threading
 from src.Map import Map
 from src.Player import Player
+from src.utils.Sockets_dict import dict_sockets
 from kafka import KafkaProducer, KafkaConsumer
 
 FORMAT = "utf-8"
@@ -115,7 +117,9 @@ def read_client(alias, passwd) -> Player:
     cursor = connect_db()
     if len(alias) <= 10 and len(passwd) <= 10:
         player_string = cursor.execute(
-            "select * from players where alias = '{}' and passwd = '{}'"
+            "select * from players where alias = '{}' and pass = '{}'".format(
+                alias, passwd
+            )
         ).fetchone()
 
         if player_string:
@@ -123,11 +127,9 @@ def read_client(alias, passwd) -> Player:
                 player = Player(player_string)
                 return player
             else:
-                # TODO Devolver error
-                pass
+                print("[WARNING] Player not found.")
     else:
-        # TODO Devolver error
-        pass
+        print("[ERROR] Parameters of client too big.")
     return None
 
 
@@ -136,6 +138,7 @@ def send_map(server):
     Sends a map with kafka to 'map_engine' topic.
     """
 
+    sleep(0.5)
     global map_read
     try:
         producer = KafkaProducer(bootstrap_servers=server)
@@ -154,14 +157,25 @@ def handle_client(connection, address):
 
     connected = True
     while connected:
-        msg_length = conn.recv(HEADER).decode(FORMAT)
+        msg_length = connection.recv(HEADER).decode(FORMAT)
         if msg_length:
             msg_length = int(msg_length)
             msg = conn.recv(msg_length).decode(FORMAT)
 
             params_msg = msg.split(",")
             if params_msg[0] == "3":
-                pass
+                # TODO Login
+                player = read_client(params_msg[1], params_msg[2])
+                if player is not None:
+                    print(
+                        "[LOGIN] User with IP {} and alias {} have logged in.".format(
+                            address[0], player.get_alias()
+                        )
+                    )
+                    connection.send(dict_sockets()["Correct"].encode(FORMAT))
+                else:
+                    print("[LOGIN ERROR] User with IP {} could not login.")
+                    connection.send(dict_sockets()["Incorrect"].encode(FORMAT))
 
 
 ########## MAIN ##########
@@ -173,15 +187,25 @@ if len(sys.argv) == 1:
     ADDR_SOCKET = (IP_SOCKET, PUERTO_SOCKET)
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind(ADDR_CLIENT)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_socket.bind(ADDR_SOCKET)
     print("[STARTING] Inicializando AA_Engine Socket Server")
     server_socket.listen()
-    print("[LISTENING] Escuchando AA_Engine Socket Server en {}".format(IP_SOCKET))
+    print(
+        "[LISTENING] Escuchando AA_Engine Socket Server en {} puerto {}".format(
+            IP_SOCKET, PUERTO_SOCKET
+        )
+    )
 
     while True:
-        conn, addr = server.accept()
+        conn, addr = server_socket.accept()
 
-        thread = threading.Thread()
+        thread_login = threading.Thread(target=handle_client, args=(conn, addr))
+        thread_sendmap = threading.Thread(target=send_map, args=(KAFKA_SERVER))
+        thread_login.start()
+        thread_sendmap.start()
+
+    server.close()
 
 
 #     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -199,3 +223,4 @@ if len(sys.argv) == 1:
 # start_game()
 # read_map()
 # send_map(KAFKA_SERVER)
+player = Player()
