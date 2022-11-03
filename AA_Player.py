@@ -1,10 +1,13 @@
 from getpass import getpass
 from kafka import KafkaProducer, KafkaConsumer
+from src.utils.Sockets_dict import dict_sockets
+from src.utils.Clear import clear
 import socket
 import sys
 
 HEADER = 64
 PORT = 5050
+KAFKA_SERVER = "localhost:9092"
 FORMAT = "utf-8"
 FIN = "FIN"
 
@@ -92,14 +95,14 @@ def editarPerfil(ip, puerto):
     client.close()
 
 
-def login(engine_ip, engine_port):
+def login(client):
     """
     Function for user login inside the MMO game.
     """
 
-    engine_addr = (engine_ip, int(engine_port))
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.connect(engine_addr)
+    # engine_addr = (engine_ip, int(engine_port))
+    # client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # client.connect(engine_addr)
 
     print(
         "Bienvenido, a continuación va a proceder a loguearse. Introduzca los siguientes datos..."
@@ -107,10 +110,31 @@ def login(engine_ip, engine_port):
     print("Alias:")
     alias = input()
 
-    print("Password")
     passwd = getpass()
 
-    send("3," + alias + "," + passwd, clien)
+    send(dict_sockets()["Login"].format(alias=alias, password=passwd), client)
+
+    msg_rcv = client.recv(2048).decode(FORMAT)
+    msg = msg_rcv.split(",")
+    if msg[1] == "1":
+        print("Logueado correctamente al servidor.")
+        play_game()
+    else:
+        print("No se ha podido loguear al servidor.")
+
+
+def play_game():
+    """
+    Function to return the map and play the game
+    """
+
+    kafka_consumer = KafkaConsumer(
+        "map_engine", enable_auto_commit=True, bootstrap_servers=KAFKA_SERVER
+    )
+    kafka_producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+
+    for message in kafka_consumer:
+        print(message.value.decode(FORMAT))
 
 
 ########## MAIN ##########
@@ -143,7 +167,8 @@ if len(sys.argv) == 3:
                     "En este momento no se pueden editar perfiles, intentelo de nuevo mas tarde"
                 )
         elif opcion == "3":
-            print("Aqui iria unierse a la partida")
+            clear()
+            login(client)
         elif opcion == "4":
             break
 
