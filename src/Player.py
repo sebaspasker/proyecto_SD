@@ -24,20 +24,33 @@ def fight(player_1, player_2):
 
 
 class Player:
-    self.position = (1, 1)
-    self.alias = ""
-    self.level = 0
-    self.cold = 0
-    self.hot = 0
-    self.dead = False
+    position = (1, 1)
+    alias = ""
+    level = 0
+    cold = 0
+    hot = 0
+    dead = False
 
     def __init__(self, string_list=None):
         if string_list is not None:
-            self.set_position(string_list[0], string_list[1])
-            self.set_level(string_list[2])
-            self.set_cold(string_list[3])
-            self.set_hot(string_list[4])
-            self.set_dead(string_list[5])
+            self.set_alias(string_list[0])
+            self.set_position(string_list[2], string_list[3])
+            self.set_level(string_list[4])
+            self.set_cold(string_list[5])
+            self.set_hot(string_list[6])
+            self.set_dead(string_list[7])
+
+    def __str__(self):
+        return (
+            "Player alias: {}\n".format(self.set_alias)
+            + "-----------------\n"
+            + "Position: {}\n".format(self.get_position())
+            + "Level: {}\n".format(self.get_level())
+            + "Cold: {}\n".format(self.get_cold())
+            + "Hot: {}\n".format(self.get_hot())
+            + "Dead: {}\n".format(self.get_deat())
+            + "-----------------\n"
+        )
 
     def fight(self, player_2):
         """
@@ -79,14 +92,8 @@ class Player:
 
     def set_position(self, x=None, y=None, move=False):
         if x is not None:
-            if x <= 20 and x >= 1:
-                self.position[0] = x
-            else:
-                raise OutOfRangeException
-
-        if y is not None:
-            if x <= 20 and x >= 1:
-                self.position[1] = y
+            if x <= 20 and x >= 1 and y <= 20 and y >= 1:
+                self.position = (x, y)
             else:
                 raise OutOfRangeException
 
@@ -105,7 +112,7 @@ class Player:
         self.alias = alias_input
 
     def set_level(self, level_input):
-        if level_input <= 0:
+        if level_input < 0:
             raise OutOfRangeException("Level should be higher or equal to 0")
 
         self.level = level_input
