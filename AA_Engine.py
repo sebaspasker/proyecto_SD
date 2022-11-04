@@ -2,6 +2,7 @@ import socket
 import sqlite3
 import sys
 import threading
+from time import sleep
 from src.Map import Map
 from src.Player import Player
 from src.utils.Sockets_dict import dict_sockets
@@ -63,7 +64,6 @@ def read_map(ddbb_server=None):
     Reads the map in the ddbb and saves it in map_read variable.
     """
 
-    global map_read
     try:
         cursor = connect_db(DB_SERVER)
 
@@ -72,12 +72,13 @@ def read_map(ddbb_server=None):
         map_str = cursor.fetchone()[1]
 
         map_read = Map(map_str)
-        print(
-            "[READING MAP] Reading map from database {} and saved in map_read.".format(
-                DB_SERVER
-            )
-        )
+        # print(
+        #     "[READING MAP] Reading map from database {} and saved in map_read.".format(
+        #         DB_SERVER
+        #     )
+        # )
 
+        return map_read
     except ValueError as VE:
         print("VALUE ERROR: Cerrando engine...")
         print("{}".format(VE.message))
@@ -91,6 +92,7 @@ def recieve_map(server):
     """
 
     global map_rec
+
     try:
         consumer = KafkaConsumer("map_engine", bootstrap_servers=server)
         map_str = ""
@@ -133,23 +135,29 @@ def read_client(alias, passwd) -> Player:
     return None
 
 
-def send_map(server):
+def send_map(server=None):
     """
     Sends a map with kafka to 'map_engine' topic.
     """
 
-    sleep(0.5)
-    global map_read
-    try:
+    if server is None:
+        producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+    else:
         producer = KafkaProducer(bootstrap_servers=server)
 
-        print("[SENDING MAP] Sending map raw char to topic '{}'".format("map_engine"))
-        producer.send("map_engine", bytes(map_read.to_raw_string(), "utf-8"))
-    except ValueError as VE:
-        print("VALUE ERROR: Cerrando engine...")
-        print("{}".format(VE.message))
-    except KeyboardInterrupt:
-        print("Keyboard Interruption: Cerrando engine...")
+    print("[SENDING MAP] Sending map raw char to topic '{}'".format("map_engine"))
+
+    while True:
+        map_read = read_map()
+
+        try:
+            producer.send("map_engine", bytes(map_read.to_raw_string(), "utf-8"))
+            sleep(2)
+        except ValueError as VE:
+            print("VALUE ERROR: Cerrando engine...")
+            print("{}".format(VE.message))
+        except KeyboardInterrupt:
+            print("Keyboard Interruption: Cerrando engine...")
 
 
 def handle_client(connection, address):
@@ -173,6 +181,9 @@ def handle_client(connection, address):
                         )
                     )
                     connection.send(dict_sockets()["Correct"].encode(FORMAT))
+
+                    thread_sendmap = threading.Thread(target=send_map, args=())
+                    thread_sendmap.start()
                 else:
                     print("[LOGIN ERROR] User with IP {} could not login.")
                     connection.send(dict_sockets()["Incorrect"].encode(FORMAT))
@@ -201,9 +212,8 @@ if len(sys.argv) == 1:
         conn, addr = server_socket.accept()
 
         thread_login = threading.Thread(target=handle_client, args=(conn, addr))
-        thread_sendmap = threading.Thread(target=send_map, args=(KAFKA_SERVER))
+        print(KAFKA_SERVER)
         thread_login.start()
-        thread_sendmap.start()
 
     server.close()
 

@@ -1,5 +1,7 @@
 from getpass import getpass
+from time import sleep
 from kafka import KafkaProducer, KafkaConsumer
+from src.Map import Map
 from src.utils.Sockets_dict import dict_sockets
 from src.utils.Clear import clear
 import socket
@@ -128,13 +130,16 @@ def play_game():
     Function to return the map and play the game
     """
 
-    kafka_consumer = KafkaConsumer(
-        "map_engine", enable_auto_commit=True, bootstrap_servers=KAFKA_SERVER
-    )
+    kafka_consumer = KafkaConsumer("map_engine", bootstrap_servers=KAFKA_SERVER)
     kafka_producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
-
     for message in kafka_consumer:
-        print(message.value.decode(FORMAT))
+        # print(len(message.value.decode(FORMAT)[-1]))
+        print(message.value.decode(FORMAT)[-400:])
+        map_player = Map(message.value.decode(FORMAT)[-400:])
+        clear()
+        print("Selecciona arriba/izquierda/derecha/abajo: (w/a/s/d)")
+        map_player.print_color()
+        sleep(1)
 
 
 ########## MAIN ##########

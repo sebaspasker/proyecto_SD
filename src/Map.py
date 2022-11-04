@@ -75,7 +75,7 @@ class Map:
             else:
                 map_str += "{} ".format(i)
 
-            for j in range(0, 2):
+            for j in range(0, 20):
                 map_str += " {} |".format(self.map_matrix[i][j])
             map_str += "\n"
 
@@ -85,15 +85,19 @@ class Map:
         """
         Converts a raw varchar(400) in the map_matrix.
         """
-        if len(map_string) < 400:
+        self.map_matrix = []
+        if len(map_string) > 400:
             raise OutOfRangeException("Debería de ser 400 carácteres.")
 
-        for i in range(0, 20):
-            row = []
-            for j in range(0, 20):
-                x = i * j
-                row.append(map_string[x])
-            self.map_matrix.append(row.copy())
+        j = 0
+        row = []
+        for i in range(0, 400):
+            row.append(map_string[i])
+            j += 1
+            if j >= 20:
+                self.map_matrix.append(row.copy())
+                j = 0
+                row = []
 
     def to_raw_string(self):
         """
