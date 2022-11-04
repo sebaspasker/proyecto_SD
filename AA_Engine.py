@@ -9,10 +9,11 @@ from src.utils.Sockets_dict import dict_sockets
 from kafka import KafkaProducer, KafkaConsumer
 
 FORMAT = "utf-8"
-KAFKA_SERVER = "localhost:9092"
+KAFKA_SERVER = "172.20.40.181:9092"
 DB_SERVER = "againstall.db"
 
-IP_SOCKET = "127.0.0.2"
+# IP_SOCKET = "127.0.0.2"
+IP_SOCKET = "172.20.40.181"
 PUERTO_SOCKET = 5050
 
 HEADER = 64
@@ -27,9 +28,11 @@ def connect_db(name=None):
     Connect a ddbb and returns a cursor.
     """
     if name is None:
-        return sqlite3.connect(DB_SERVER).cursor()
+        connection = sqlite3.connect(DB_SERVER)
+        return sqlite3.connect(DB_SERVER).cursor(), connection
     else:
-        return sqlite3.connect(name).cursor()
+        connection = sqlite3.connect(name)
+        return sqlite3.connect(name).cursor(), connection
 
 
 def start_game():
@@ -40,7 +43,8 @@ def start_game():
     global map_engine
     map_engine = Map()
 
-    cursor = connect_db()
+    connection = sqlite3.connect(DB_SERVER)
+    cursor = connection.cursor()
 
     command = "select * from player_id;"
     id_rows = cursor.execute(command).fetchall()
@@ -65,7 +69,7 @@ def read_map(ddbb_server=None):
     """
 
     try:
-        cursor = connect_db(DB_SERVER)
+        cursor, connection = connect_db(DB_SERVER)
 
         cursor.execute("select * from map_engine")
 
@@ -116,7 +120,7 @@ def resolve_user(server):
 
 
 def read_client(alias, passwd) -> Player:
-    cursor = connect_db()
+    cursor, connection = connect_db()
     if len(alias) <= 10 and len(passwd) <= 10:
         player_string = cursor.execute(
             "select * from players where alias = '{}' and pass = '{}'".format(
@@ -188,6 +192,9 @@ def handle_client(connection, address):
                     print("[LOGIN ERROR] User with IP {} could not login.")
                     connection.send(dict_sockets()["Incorrect"].encode(FORMAT))
 
+# TODO Empezar partida para que cuando pase un timeout aunque solo sea un jugador o cuando hay un máximo de jugadores
+# TODO La partida termina cuando solo queda uno
+# TODO Nos ha dado error en el puerto de kafka - Revisar puertos antes de ejecutar en el labaratorio.
 
 ########## MAIN ##########
 if len(sys.argv) == 1:
@@ -195,6 +202,7 @@ if len(sys.argv) == 1:
     #     MAXJUGADORES = 3
     #     PUERTO_WEATHER = 8080
     #     ADDR = (IP, PUERTO_WEATHER)
+    start_game()
     ADDR_SOCKET = (IP_SOCKET, PUERTO_SOCKET)
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

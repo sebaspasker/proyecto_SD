@@ -4,6 +4,7 @@ connection = sqlite3.connect("./againstall.db")
 cursor = connection.cursor()
 cursor.execute("DROP TABLE IF EXISTS players")
 cursor.execute("DROP TABLE IF EXISTS player_id")
+cursor.execute("DROP TABLE IF EXISTS map_engine")
 
 table_p = """ CREATE TABLE players(
             alias text primary key,
