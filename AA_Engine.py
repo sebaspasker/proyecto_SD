@@ -59,6 +59,10 @@ def start_game():
     connection.close()
 
 
+def start_game_client():
+    pass
+
+
 def read_map(ddbb_server=None):
     """
     Reads the map in the ddbb and saves it in map_read variable.
