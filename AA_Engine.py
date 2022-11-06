@@ -19,6 +19,12 @@ PUERTO_SOCKET = 5050
 HEADER = 64
 FORMAT = "utf-8"
 
+MAX_USERS = 4
+connected = 0
+
+GAME_STARTED = False
+WAIT_STARTED = False
+
 sys.path.append("src")
 sys.path.append("src/exceptions")
 
@@ -35,10 +41,12 @@ def connect_db(name=None):
         return sqlite3.connect(name).cursor(), connection
 
 
-def start_game():
+def create_map():
     """
-    Start a map game and saves it in the ddbb.
+    Create a map game and saves it in the ddbb.
     """
+
+    print("[CREATING MAP] Creating the map and saving in the ddbb.")
 
     global map_engine
     map_engine = Map()
@@ -63,8 +71,41 @@ def start_game():
     connection.close()
 
 
-def start_game_client():
-    pass
+def start_game_server(kafka_server=None):
+    """
+    Waits 60 second until the number of connected are max or
+    time passes and starts the game
+    """
+    producer = (
+        KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+        if kafka_server is None
+        else KafkaProducer(bootstrap_servers=kafka_server)
+    )
+
+    print("[WAITING FOR USERS] Wating 60 seconds until users are connected...")
+
+    WAIT_STARTED = True
+
+    # Waits users
+    for t in range(0, 60):
+        producer.send(
+            "start_game",
+            bytes(dict_sockets["Start_Waiting"].format(connected=connected), "utf-8"),
+        )
+        if connected == MAX_USERS:
+            break
+        sleep(1)
+
+    # Send user that the game starts
+    if connected > 1:
+        for t in range(0, 4):
+            producer.send(
+                "start_game", bytes(dict_sockets["Start"].format(connected=connected))
+            )
+            sleep(0.5)
+
+    create_map()
+    send_map()
 
 
 def read_map(ddbb_server=None):
@@ -119,11 +160,10 @@ def recieve_map(server):
         print("Keyboard Interruption: Cerrando engine...")
 
 
-def resolve_user(server):
-    pass
-
-
 def read_client(alias, passwd) -> Player:
+    """
+    Read a client from the ddbb and returns the player.
+    """
     cursor, connection = connect_db()
     if len(alias) <= 10 and len(passwd) <= 10:
         player_string = cursor.execute(
@@ -148,6 +188,8 @@ def send_map(server=None):
     Sends a map with kafka to 'map_engine' topic.
     """
 
+    START_GAME = True
+
     if server is None:
         producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
     else:
@@ -168,7 +210,15 @@ def send_map(server=None):
             print("Keyboard Interruption: Cerrando engine...")
 
 
+def resolve_user(server):
+    pass
+
+
 def handle_client(connection, address):
+    """
+    Handle client connection to login, start the game and play.
+    """
+
     print("[NEW CONEXION] {} connected.".format(connection))
 
     connected = True
@@ -180,7 +230,6 @@ def handle_client(connection, address):
 
             params_msg = msg.split(",")
             if params_msg[0] == "3":
-                # TODO Login
                 player = read_client(params_msg[1], params_msg[2])
                 if player is not None:
                     print(
@@ -190,11 +239,29 @@ def handle_client(connection, address):
                     )
                     connection.send(dict_sockets()["Correct"].encode(FORMAT))
 
-                    thread_sendmap = threading.Thread(target=send_map, args=())
-                    thread_sendmap.start()
+                    connected += 1
+
+                    # Waits connection with players
+                    if not GAME_STARTED and not WAIT_STARTED:
+                        thread_start_game = threading.Thread(
+                            target=start_game_server, args=()
+                        )
+                        thread_start_game.start()
+                    # If game not started does nothing with the client
+                    elif not GAME_STARTED:
+                        while True:
+                            if GAME_STARTED:
+                                break
+                            else:
+                                sleep(1)
+                    # Resolve the user to play the game
+                    else:
+                        resolve_user()
+
                 else:
                     print("[LOGIN ERROR] User with IP {} could not login.")
                     connection.send(dict_sockets()["Incorrect"].encode(FORMAT))
+
 
 # TODO Empezar partida para que cuando pase un timeout aunque solo sea un jugador o cuando hay un máximo de jugadores
 # TODO La partida termina cuando solo queda uno
@@ -245,4 +312,3 @@ if len(sys.argv) == 1:
 # start_game()
 # read_map()
 # send_map(KAFKA_SERVER)
-player = Player()

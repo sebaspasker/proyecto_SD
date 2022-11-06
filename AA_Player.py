@@ -120,9 +120,27 @@ def login(client):
     msg = msg_rcv.split(",")
     if msg[1] == "1":
         print("Logueado correctamente al servidor.")
-        play_game()
+        start_game()
     else:
         print("No se ha podido loguear al servidor.")
+
+
+def start_game(server_kafka):
+    wait_text = "Please, wait until another clients connect...\n Conected users: {}"
+    consumer = (
+        KafkaConsumer("start_game", bootstrap_servers=KAFKA_SERVER)
+        if server_kafka is None
+        else KafkaConsumer("start_game", bootstrap_servers=server_kafka)
+    )
+
+    for message in consumer:
+        msg_split = message.split(",")
+        if msg_split[1] == "Waiting":
+            clear()
+            print(wait_text.format(msg_split[2]))
+        elif msg_split[2] == "Start":
+            clear()
+            print("Waiting to response...")
 
 
 def play_game():
