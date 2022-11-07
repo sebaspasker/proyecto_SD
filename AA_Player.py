@@ -120,7 +120,7 @@ def login(client):
     msg = msg_rcv.split(",")
     if msg[1] == "1":
         print("Logueado correctamente al servidor.")
-        start_game()
+        start_game(KAFKA_SERVER)
     else:
         print("No se ha podido loguear al servidor.")
 
@@ -134,11 +134,11 @@ def start_game(server_kafka):
     )
 
     for message in consumer:
-        msg_split = message.split(",")
-        if msg_split[1] == "Waiting":
+        msg_split = message.value.decode(FORMAT).split(",")
+        if msg_split[-3:][1] == "Waiting":
             clear()
             print(wait_text.format(msg_split[2]))
-        elif msg_split[2] == "Start":
+        elif msg_split[-3:][1] == "Start":
             clear()
             print("Waiting to response...")
 

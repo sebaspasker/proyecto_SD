@@ -9,18 +9,18 @@ from src.utils.Sockets_dict import dict_sockets
 from kafka import KafkaProducer, KafkaConsumer
 
 FORMAT = "utf-8"
-KAFKA_SERVER = "172.20.40.181:9092"
+KAFKA_SERVER = "127.0.0.2:9092"
 DB_SERVER = "againstall.db"
 
 # IP_SOCKET = "127.0.0.2"
-IP_SOCKET = "172.20.40.181"
+IP_SOCKET = "127.0.0.2"
 PUERTO_SOCKET = 5050
 
 HEADER = 64
 FORMAT = "utf-8"
 
 MAX_USERS = 4
-connected = 0
+CONNECTED = 0
 
 GAME_STARTED = False
 WAIT_STARTED = False
@@ -90,9 +90,9 @@ def start_game_server(kafka_server=None):
     for t in range(0, 60):
         producer.send(
             "start_game",
-            bytes(dict_sockets["Start_Waiting"].format(connected=connected), "utf-8"),
+            bytes(dict_sockets()["Start_Waiting"].format(connected=CONNECTED), "utf-8"),
         )
-        if connected == MAX_USERS:
+        if CONNECTED == MAX_USERS:
             break
         sleep(1)
 
@@ -100,7 +100,7 @@ def start_game_server(kafka_server=None):
     if connected > 1:
         for t in range(0, 4):
             producer.send(
-                "start_game", bytes(dict_sockets["Start"].format(connected=connected))
+                "start_game", bytes(dict_sockets()["Start"].format(connected=CONNECTED))
             )
             sleep(0.5)
 
@@ -219,6 +219,8 @@ def handle_client(connection, address):
     Handle client connection to login, start the game and play.
     """
 
+    global CONNECTED
+
     print("[NEW CONEXION] {} connected.".format(connection))
 
     connected = True
@@ -239,7 +241,7 @@ def handle_client(connection, address):
                     )
                     connection.send(dict_sockets()["Correct"].encode(FORMAT))
 
-                    connected += 1
+                    CONNECTED += 1
 
                     # Waits connection with players
                     if not GAME_STARTED and not WAIT_STARTED:
@@ -273,7 +275,6 @@ if len(sys.argv) == 1:
     #     MAXJUGADORES = 3
     #     PUERTO_WEATHER = 8080
     #     ADDR = (IP, PUERTO_WEATHER)
-    start_game()
     ADDR_SOCKET = (IP_SOCKET, PUERTO_SOCKET)
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
