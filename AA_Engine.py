@@ -24,6 +24,10 @@ CONNECTED = 0
 
 GAME_STARTED = False
 WAIT_STARTED = False
+SENDING_MAP = False
+MAP_CREATED = False
+
+TIME_WAIT_SEC = 20
 
 sys.path.append("src")
 sys.path.append("src/exceptions")
@@ -69,6 +73,8 @@ def create_map():
 
     connection.commit()
     connection.close()
+    global MAP_CREATED
+    MAP_CREATED = True
 
 
 def start_game_server(kafka_server=None):
@@ -76,36 +82,51 @@ def start_game_server(kafka_server=None):
     Waits 60 second until the number of connected are max or
     time passes and starts the game
     """
+
+    global SENDING_MAP
+    global MAP_CREATED
+
     producer = (
         KafkaProducer(bootstrap_servers=KAFKA_SERVER)
         if kafka_server is None
         else KafkaProducer(bootstrap_servers=kafka_server)
     )
 
-    print("[WAITING FOR USERS] Wating 60 seconds until users are connected...")
+    print(
+        "[WAITING FOR USERS] Waiting {} seconds until users are connected...".format(
+            str(TIME_WAIT_SEC)
+        )
+    )
 
     WAIT_STARTED = True
 
     # Waits users
-    for t in range(0, 60):
+    for t in range(0, TIME_WAIT_SEC):
         producer.send(
             "start_game",
-            bytes(dict_sockets()["Start_Waiting"].format(connected=CONNECTED), "utf-8"),
+            bytes(dict_sockets()["Start_Waiting"].format(connected=CONNECTED), FORMAT),
         )
         if CONNECTED == MAX_USERS:
             break
         sleep(1)
 
     # Send user that the game starts
-    if connected > 1:
+    if CONNECTED > 1:
         for t in range(0, 4):
             producer.send(
-                "start_game", bytes(dict_sockets()["Start"].format(connected=CONNECTED))
+                "start_game",
+                bytes(dict_sockets()["Start"].format(connected=CONNECTED), FORMAT),
             )
             sleep(0.5)
 
-    create_map()
-    send_map()
+    if MAP_CREATED is not False:
+        thread_create_map = threading.Thread(target=create_map, args=())
+        thread_create_map.start()
+
+    if not SENDING_MAP:
+        SENDING_MAP = True
+        thread_send_map = threading.Thread(target=send_map, args=())
+        thread_send_map.start()
 
 
 def read_map(ddbb_server=None):
@@ -188,7 +209,10 @@ def send_map(server=None):
     Sends a map with kafka to 'map_engine' topic.
     """
 
-    START_GAME = True
+    global GAME_STARTED
+    global SENDING_MAP
+    GAME_STARTED = True
+    SENDING_MAP = True
 
     if server is None:
         producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
@@ -210,8 +234,19 @@ def send_map(server=None):
             print("Keyboard Interruption: Cerrando engine...")
 
 
-def resolve_user(server):
-    pass
+def resolve_user(kafka_server=None):
+    producer = (
+        KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+        if kafka_server is None
+        else KafkaProducer(bootstrap_servers=kafka_server)
+    )
+
+    for t in range(0, 8):
+        producer.send(
+            "start_game",
+            bytes(dict_sockets()["Start_Game"].format(connected=CONNECTED), FORMAT),
+        )
+        sleep(0.5)
 
 
 def handle_client(connection, address):
@@ -249,17 +284,16 @@ def handle_client(connection, address):
                             target=start_game_server, args=()
                         )
                         thread_start_game.start()
-                    # If game not started does nothing with the client
-                    elif not GAME_STARTED:
-                        while True:
-                            if GAME_STARTED:
-                                break
-                            else:
-                                sleep(1)
-                    # Resolve the user to play the game
-                    else:
-                        resolve_user()
 
+                    # If game not started does nothing with the client
+                    while True:
+                        if GAME_STARTED:
+                            break
+                        else:
+                            sleep(1)
+
+                    # Resolve the user to play the game
+                    resolve_user()
                 else:
                     print("[LOGIN ERROR] User with IP {} could not login.")
                     connection.send(dict_sockets()["Incorrect"].encode(FORMAT))

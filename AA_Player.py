@@ -141,6 +141,11 @@ def start_game(server_kafka):
         elif msg_split[-3:][1] == "Start":
             clear()
             print("Waiting to response...")
+        elif msg_split[-3:][1] == "Start_Game":
+            clear()
+            print("GAME STARTS WITH {} USERS".format(msg_split[-3:][2]))
+            sleep(3)
+            play_game()
 
 
 def play_game():
@@ -157,7 +162,6 @@ def play_game():
         clear()
         print("Selecciona arriba/izquierda/derecha/abajo: (w/a/s/d)")
         map_player.print_color()
-        sleep(1)
 
 
 ########## MAIN ##########
