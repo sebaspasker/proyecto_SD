@@ -53,3 +53,7 @@ Thumbs.db
 login/*
 licenses/
 
+logs/
+logs/*
+bin/kafka*/logs
+*.log.*
