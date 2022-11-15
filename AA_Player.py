@@ -1,7 +1,9 @@
 from getpass import getpass
 from time import sleep
 from kafka import KafkaProducer, KafkaConsumer
+from src.exceptions.socket_exception import SocketException
 from src.Map import Map
+from src.Player import Player
 from src.utils.Sockets_dict import dict_sockets
 from src.utils.Clear import clear
 import socket
@@ -12,6 +14,9 @@ PORT = 5050
 KAFKA_SERVER = "localhost:9092"
 FORMAT = "utf-8"
 FIN = "FIN"
+LOGIN_ID = -1
+
+PLAYER = Player()
 
 
 # Función para enviar mensajes cliente
@@ -97,6 +102,20 @@ def editarPerfil(ip, puerto):
     client.close()
 
 
+def process_player(msg):
+    msg_split = msg.split(",")
+    if msg_split[0] != "7":
+        raise SocketException("Incorrect socket message should be 7")
+    player = Player()
+    player.set_position(int(msg_split[1]), int(msg_split[2]))
+    player.set_alias(msg_split[3])
+    player.set_level(int(msg_split[4]))
+    player.set_hot(int(msg_split[5]))
+    player.set_cold(int(msg_split[6]))
+    player.set_dead(bool(msg_split[7]))
+    return player
+
+
 def login(client):
     """
     Function for user login inside the MMO game.
@@ -120,6 +139,7 @@ def login(client):
     msg = msg_rcv.split(",")
     if msg[1] == "1":
         print("Logueado correctamente al servidor.")
+        PLAYER = process_player(client.recv(2048).decode(FORMAT))
         start_game(KAFKA_SERVER)
     else:
         print("No se ha podido loguear al servidor.")
@@ -156,12 +176,16 @@ def play_game():
     kafka_consumer = KafkaConsumer("map_engine", bootstrap_servers=KAFKA_SERVER)
     kafka_producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
     for message in kafka_consumer:
-        # print(len(message.value.decode(FORMAT)[-1]))
-        print(message.value.decode(FORMAT)[-400:])
+        # print(message.value.decode(FORMAT)[-400:])
         map_player = Map(message.value.decode(FORMAT)[-400:])
         clear()
         print("Selecciona arriba/izquierda/derecha/abajo: (w/a/s/d)")
         map_player.print_color()
+        key = input()  # TODO Cambiar a tecla estática
+        kafka_producer.send(
+            "move_player_{}".format(player),
+            bytes(Sockets_dict()["Move"].format(key=key, player_id=LOGIN_ID), FORMAT),
+        )
 
 
 ########## MAIN ##########
@@ -196,6 +220,7 @@ if len(sys.argv) == 3:
         elif opcion == "3":
             clear()
             login(client)
+            LOGIN_ID = -1
         elif opcion == "4":
             break
 

@@ -1,2 +1,3 @@
 Crear el gestor de colas para desplegar el mapa 
 Crear script para crear la tabla con sqlite3
+loguru

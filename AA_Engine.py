@@ -6,6 +6,7 @@ from time import sleep
 from src.Map import Map
 from src.Player import Player
 from src.utils.Sockets_dict import dict_sockets
+from src.utils.Process_position import process_position
 from kafka import KafkaProducer, KafkaConsumer
 
 FORMAT = "utf-8"
@@ -26,8 +27,11 @@ GAME_STARTED = False
 WAIT_STARTED = False
 SENDING_MAP = False
 MAP_CREATED = False
+MOVE_RECEIVER = False
 
 TIME_WAIT_SEC = 20
+
+last_id_msg = {}  # Last id for message client
 
 sys.path.append("src")
 sys.path.append("src/exceptions")
@@ -61,7 +65,7 @@ def create_map():
     command = "select * from player_id;"
     id_rows = cursor.execute(command).fetchall()
 
-    map_engine.distribute_ids(id_rows)
+    # map_engine.distribute_ids(id_rows)
 
     # map_engine.print_color()
 
@@ -234,7 +238,35 @@ def send_map(server=None):
             print("Keyboard Interruption: Cerrando engine...")
 
 
-def resolve_user(kafka_server=None):
+def process_key(key, position_, player):
+    act_map = read_map()
+    position = process_position(position_)
+    new_position = see_new_position(position, key)
+    print("IN")
+
+
+def process_client_msg(msgs, player):
+    global last_id_msg
+
+    Alias = player.get_alias()[0]
+
+    for msg_ in msgs[-5:]:  # Separated msgs by spaces
+        msg = msg_.split(",")  # Separate msg by comma
+        if msg[0] != "6":
+            pass
+        if int(msg[3]) <= last_id_msg[Alias]:
+            pass
+        key = msg[1]
+        position = msg[2]  # Different format
+        process_key(key, position, player)
+
+
+def resolve_user(player, kafka_server=None):
+    global last_id_msg
+    global MOVE_RECEIVER
+
+    last_id_msg[player.get_alias()[0]] = 0
+
     producer = (
         KafkaProducer(bootstrap_servers=KAFKA_SERVER)
         if kafka_server is None
@@ -247,6 +279,19 @@ def resolve_user(kafka_server=None):
             bytes(dict_sockets()["Start_Game"].format(connected=CONNECTED), FORMAT),
         )
         sleep(0.5)
+
+    if MOVE_RECEIVER is False:
+        MOVE_RECEIVER = True
+        consumer = KafkaConsumer(
+            "read_user_move_{}".format(player.get_alias()[0]),
+            bootstrap_servers=KAFKA_SERVER,
+        )
+        for msg in consumer:
+            msg_split = msg.value.dedode(FORMAT).split(" ")
+            thread_process_client_msg = threading.Thread(
+                target=process_client_msg, args=(msg_split, player)
+            )
+            thread_process_client_msg.start()
 
 
 def handle_client(connection, address):
@@ -293,7 +338,7 @@ def handle_client(connection, address):
                             sleep(1)
 
                     # Resolve the user to play the game
-                    resolve_user()
+                    resolve_user(player)
                 else:
                     print("[LOGIN ERROR] User with IP {} could not login.")
                     connection.send(dict_sockets()["Incorrect"].encode(FORMAT))
