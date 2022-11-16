@@ -1,0 +1,1 @@
+scripts de path kafka y zookeeper y ejecucion para ejecutar en clase
