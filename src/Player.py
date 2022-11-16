@@ -34,7 +34,7 @@ class Player:
     def __init__(self, string_list=None):
         if string_list is not None:
             self.set_alias(string_list[0])
-            self.set_position(string_list[2], string_list[3])
+            self.position = (int(string_list[2]), int(string_list[3]))
             self.set_level(string_list[4])
             self.set_cold(string_list[5])
             self.set_hot(string_list[6])
@@ -92,7 +92,7 @@ class Player:
 
     def set_position(self, x=None, y=None, move=False):
         if x is not None:
-            if x <= 20 and x >= 1 and y <= 20 and y >= 1:
+            if x <= 19 and x >= 0 and y <= 19 and y >= 0:
                 self.position = (x, y)
             else:
                 raise OutOfRangeException

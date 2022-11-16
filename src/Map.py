@@ -5,6 +5,7 @@ from random import choices, randint
 from .Player import *
 
 import sys
+import string
 
 # sys.path.append("../")
 
@@ -34,13 +35,10 @@ class Position:
 
 
 # TODO Cambiar a jugadores y NPC ids
-dict_positions = {
-    " ": "None",
-    "P": "Player",
-    "N": "NPC",
-    "M": "Mine",
-    "F": "Food",
-}
+dict_positions = {" ": "None", "M": "Mine", "F": "Food"}
+dict_positions[range(1, 10)] = "NPC"
+for char in list(string.ascii_lowercase):
+    dict_positions[char] = "Player"
 
 
 def in_map_range(x, y):
@@ -191,26 +189,23 @@ class Map:
         """
 
         player.set_dead(True)
-        self.set_map(old_position[0], old_position[1], 0, None)
-
-        # TODO Gestionamos en la base de datos
-        # TODO Gestionamos en sockets
+        self.set_map_matrix(old_position[0], old_position[1], " ")
+        self.set_map_matrix(new_position[0], new_position[1], " ")
 
     def evaluate_food(self, old_position, new_position, player, food):
-        player.set_level(player.get_level() + 1)
+        if player.get_level() < 10:
+            player.set_level(player.get_level() + 1)
 
         # Set map positions
         player.set_position(new_position[0], new_position[1])
-        self.set_map(old_position[0], old_position[1], 0, None)
-        self.set_map(new_position[0], new_position[1], 1, player)
+        self.set_map_matrix(old_position[0], old_position[1], " ")
+        self.set_map_matrix(
+            new_position[0], old_position[1], player.get_alias().lower()[0]
+        )
+        # self.set_map(old_position[0], old_position[1], 0, None)
+        # self.set_map(new_position[0], new_position[1], 1, player)
 
-    def evaluate_move(self, old_position, new_position):
-        # TODO test
-        # See if old position is a player
-        if self.evaluate_position(old_position) != "Player":
-            raise NotPlayerException("Position should be a player")
-        else:
-            player = self.get_map_class(old_position[0], old_position[1])
+    def evaluate_move(self, old_position, new_position, player):
 
         # Evaluate what is in the new position
         new_position_class = self.evaluate_position(new_position)
@@ -218,8 +213,9 @@ class Map:
         # If in the new position there is a player or NPC,
         # they fight
         if new_position_class == "Player" or new_position_class == "NPC":
-            # TODO Test
-            self.evaluate_fight(old_position, new_position, player, new_position_class)
+            # TODO Detectar nivel jugador y en base a eso eliminar al otro o no
+            # self.evaluate_fight(old_position, new_position, player, new_position_class)
+            pass
         elif new_position_class == "Mine":
             self.evaluate_mine(old_position, new_position, player, new_position_class)
         elif new_position_class == "Food":
@@ -227,27 +223,31 @@ class Map:
         elif new_position_class == "None":
             # Moves player
             player.set_position(new_position[0], new_position[1])
-            self.set_map(old_position[0], old_position[1], 0, None)
-            self.set_map(new_position[0], new_position[1], 1, player)
+            self.set_map_matrix(old_position[0], old_position[1], " ")
+            self.set_map_matrix(
+                new_position[0], new_position[1], player.get_alias().lower()[0]
+            )
 
-        if get_city(old_position) != get_city(new_position):
-            # TODO
-            # Mirar la temperatura del servidor de temperatura y evaluar en base a
-            # ello el jugador
-            pass
+        # if get_city(old_position) != get_city(new_position):
+        # TODO
+        # Mirar la temperatura del servidor de temperatura y evaluar en base a
+        # ello el jugador
+        # pass
 
-        print(self.get_map_matrix)
+        # print(self.get_map_matrix)
 
     # SETTERS
     def set_map_matrix(self, x, y, char):
         self.map_matrix[x][y] = char
 
+    @DeprecationWarning
     def set_map_class(self, x, y, obj):
         if in_map_range(x, y):
             self.map_class[x][y] = obj
         else:
             raise OutOfRangeException("Range should be between 0 and 19")
 
+    @DeprecationWarning
     def set_map(self, x, y, num, obj):
         """
         Change map Matrix of numbers and change map Matrix of objects

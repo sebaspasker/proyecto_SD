@@ -3,6 +3,10 @@ def process_position(position_):
     Enters a position with format "[x.y]" and convert
     it as a tuple
     """
-    postion_out = position[1:-2]
+    position_out = position_[1:-1]
     x, y = position_out.split(".")
-    return (x, y)
+    return (int(x), int(y))
+
+
+def position_str(position):
+    return "[{}.{}]".format(str(position[0]), str(position[1]))
