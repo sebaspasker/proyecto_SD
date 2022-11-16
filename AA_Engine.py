@@ -2,6 +2,7 @@ import socket
 import sqlite3
 import sys
 import threading
+import random
 from time import sleep
 from src.Map import Map
 from src.Player import Player
@@ -62,23 +63,56 @@ def create_map():
     connection = sqlite3.connect(DB_SERVER)
     cursor = connection.cursor()
 
-    command = "select * from player_id;"
-    id_rows = cursor.execute(command).fetchall()
-
-    # map_engine.distribute_ids(id_rows)
-
-    # map_engine.print_color()
-
     cursor.execute("delete from map_engine;")
     connection.commit()
-    cursor.execute(
-        "insert into map_engine(map) values('{}')".format(map_engine.to_raw_string())
-    )
+    save_map(map_engine)
+
+    # Actualiza y mete los jugadores activos en el mapa
+    actualize_players_position()
 
     connection.commit()
     connection.close()
     global MAP_CREATED
     MAP_CREATED = True
+
+
+def save_player_position(connection, cursor, alias, x, y):
+    cursor.execute(
+        "update players set x = {}, y = {} where alias = '{}'".format(x, y, alias)
+    )
+
+
+def actualize_players_position():
+    connection = sqlite3.connect(DB_SERVER)
+    cursor = connection.cursor()
+    id_rows = cursor.execute("select * from players where active = 1").fetchall()
+    map_ = read_map()
+    cursor.execute("delete from map_engine;")
+    for row in id_rows:
+        x, y = random.randint(1, 18), random.randint(1, 18)
+        map_.set_map_matrix(x, y, row[0].lower()[0])
+        save_player_position(connection, cursor, row[0], x, y)
+        cursor.execute(
+            "update players set x = {}, y = {} where alias = '{}'".format(
+                int(x), int(y), row[0]
+            )
+        )
+    connection.commit()
+    connection.close()
+    save_map(map_)
+
+
+def save_map(map_to_saved):
+    # map_actual = read_map()
+    connection = sqlite3.connect(DB_SERVER)
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "insert into map_engine(map) values('{}')".format(map_to_saved.to_raw_string())
+    )
+
+    connection.commit()
+    connection.close()
 
 
 def start_game_server(kafka_server=None):
@@ -104,6 +138,10 @@ def start_game_server(kafka_server=None):
 
     WAIT_STARTED = True
 
+    if MAP_CREATED is False:
+        thread_create_map = threading.Thread(target=create_map, args=())
+        thread_create_map.start()
+
     # Waits users
     for t in range(0, TIME_WAIT_SEC):
         producer.send(
@@ -123,10 +161,6 @@ def start_game_server(kafka_server=None):
             )
             sleep(0.5)
 
-    if MAP_CREATED is not False:
-        thread_create_map = threading.Thread(target=create_map, args=())
-        thread_create_map.start()
-
     if not SENDING_MAP:
         SENDING_MAP = True
         thread_send_map = threading.Thread(target=send_map, args=())
@@ -141,7 +175,7 @@ def read_map(ddbb_server=None):
     try:
         cursor, connection = connect_db(DB_SERVER)
 
-        cursor.execute("select * from map_engine")
+        cursor.execute("select * from map_engine order by id desc")
 
         map_str = cursor.fetchone()[1]
 
@@ -238,11 +272,34 @@ def send_map(server=None):
             print("Keyboard Interruption: Cerrando engine...")
 
 
+def see_new_position(position, key):
+    if key == "w":
+        return (position[0] - 1 if position[0] > 0 else 19, position[1])
+    elif key == "a":
+        return (position[0], position[1] - 1 if position[1] > 0 else 19)
+    elif key == "s":
+        return (position[0] + 1 if position[0] < 19 else 0, position[1])
+    elif key == "d":
+        return (position[0], position[1] + 1 if position[1] < 19 else 0)
+    else:
+        return None
+
+
+def process_player_dead(player):
+    pass  # TODO
+
+
 def process_key(key, position_, player):
     act_map = read_map()
     position = process_position(position_)
     new_position = see_new_position(position, key)
-    print("IN")
+    if new_position is None:
+        return False
+    act_map.evaluate_move(position, new_position, player)
+    if player.get_dead():
+        process_player_dead(player)
+    print(act_map.print_color())
+    save_map(act_map)
 
 
 def process_client_msg(msgs, player):
@@ -283,15 +340,28 @@ def resolve_user(player, kafka_server=None):
     if MOVE_RECEIVER is False:
         MOVE_RECEIVER = True
         consumer = KafkaConsumer(
-            "read_user_move_{}".format(player.get_alias()[0]),
+            "move_player_{}".format(player.get_alias()[0]),
             bootstrap_servers=KAFKA_SERVER,
         )
+
         for msg in consumer:
-            msg_split = msg.value.dedode(FORMAT).split(" ")
+            msg_split = msg.value.decode(FORMAT).split(" ")
             thread_process_client_msg = threading.Thread(
                 target=process_client_msg, args=(msg_split, player)
             )
             thread_process_client_msg.start()
+
+
+def string_socket_format_player(player):
+    return dict_sockets()["Player"].format(
+        x=str(player.get_position()[0]),
+        y=str(player.get_position()[1]),
+        alias=player.get_alias(),
+        level=str(player.get_level()),
+        hot=str(player.get_hot()),
+        cold=str(player.get_cold()),
+        dead=str(player.get_dead()),
+    )
 
 
 def handle_client(connection, address):
@@ -305,9 +375,9 @@ def handle_client(connection, address):
 
     connected = True
     while connected:
-        msg_length = connection.recv(HEADER).decode(FORMAT)
-        if msg_length:
-            msg_length = int(msg_length)
+        msg = connection.recv(HEADER).decode(FORMAT)
+        if msg:
+            msg_length = len(msg)
             msg = conn.recv(msg_length).decode(FORMAT)
 
             params_msg = msg.split(",")
@@ -320,6 +390,7 @@ def handle_client(connection, address):
                         )
                     )
                     connection.send(dict_sockets()["Correct"].encode(FORMAT))
+                    connection.send(string_socket_format_player(player).encode(FORMAT))
 
                     CONNECTED += 1
 
@@ -344,9 +415,10 @@ def handle_client(connection, address):
                     connection.send(dict_sockets()["Incorrect"].encode(FORMAT))
 
 
-# TODO Empezar partida para que cuando pase un timeout aunque solo sea un jugador o cuando hay un máximo de jugadores
-# TODO La partida termina cuando solo queda uno
-# TODO Nos ha dado error en el puerto de kafka - Revisar puertos antes de ejecutar en el labaratorio.
+# TODO Seguramente en el handle client -> Solo uno acepta los movimientos
+# TODO Al moverse no se mueve bien el usuario
+# TODO Maps hay veces que no borra el movimiento anterior
+# TODO Arreglar engine
 
 ########## MAIN ##########
 if len(sys.argv) == 1:

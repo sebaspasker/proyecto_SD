@@ -6,6 +6,7 @@ from src.Map import Map
 from src.Player import Player
 from src.utils.Sockets_dict import dict_sockets
 from src.utils.Clear import clear
+from src.utils.Process_position import position_str
 import socket
 import sys
 
@@ -17,6 +18,7 @@ FIN = "FIN"
 LOGIN_ID = -1
 
 PLAYER = Player()
+MOVE_ID = 1
 
 
 # Función para enviar mensajes cliente
@@ -120,6 +122,7 @@ def login(client):
     """
     Function for user login inside the MMO game.
     """
+    global PLAYER
 
     # engine_addr = (engine_ip, int(engine_port))
     # client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -172,6 +175,7 @@ def play_game():
     """
     Function to return the map and play the game
     """
+    global PLAYER, MOVE_ID
 
     kafka_consumer = KafkaConsumer("map_engine", bootstrap_servers=KAFKA_SERVER)
     kafka_producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
@@ -183,8 +187,15 @@ def play_game():
         map_player.print_color()
         key = input()  # TODO Cambiar a tecla estática
         kafka_producer.send(
-            "move_player_{}".format(player),
-            bytes(Sockets_dict()["Move"].format(key=key, player_id=LOGIN_ID), FORMAT),
+            "move_player_{}".format(PLAYER.get_alias()[0]),
+            bytes(
+                dict_sockets()["Move"].format(
+                    key=key,
+                    move_id=MOVE_ID,
+                    position=position_str(PLAYER.get_position()),
+                ),
+                FORMAT,
+            ),
         )
 
 
