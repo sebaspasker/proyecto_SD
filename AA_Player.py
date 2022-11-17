@@ -7,6 +7,7 @@ from src.Player import Player
 from src.utils.Sockets_dict import dict_sockets
 from src.utils.Clear import clear
 from src.utils.Process_position import position_str
+import threading
 import socket
 import sys
 
@@ -108,13 +109,14 @@ def process_player(msg):
     msg_split = msg.split(",")
     if msg_split[0] != "7":
         raise SocketException("Incorrect socket message should be 7")
-    player = Player()
-    player.set_position(int(msg_split[1]), int(msg_split[2]))
-    player.set_alias(msg_split[3])
-    player.set_level(int(msg_split[4]))
-    player.set_hot(int(msg_split[5]))
-    player.set_cold(int(msg_split[6]))
-    player.set_dead(bool(msg_split[7]))
+    msg_split.pop(0)
+    player = Player(msg_split)
+    # player.set_position(int(msg_split[1]), int(msg_split[2]))
+    # player.set_alias(msg_split[3])
+    # player.set_level(int(msg_split[4]))
+    # player.set_hot(int(msg_split[5]))
+    # player.set_cold(int(msg_split[6]))
+    # player.set_dead(bool(msg_split[7]))
     return player
 
 
@@ -142,7 +144,8 @@ def login(client):
     msg = msg_rcv.split(",")
     if msg[1] == "1":
         print("Logueado correctamente al servidor.")
-        PLAYER = process_player(client.recv(2048).decode(FORMAT))
+        ply_sck = client.recv(2048).decode(FORMAT)
+        PLAYER = process_player(ply_sck)
         start_game(KAFKA_SERVER)
     else:
         print("No se ha podido loguear al servidor.")
@@ -171,19 +174,43 @@ def start_game(server_kafka):
             play_game()
 
 
-def play_game():
+def read_map_cli():
     """
-    Function to return the map and play the game
+    Function to read and print a map
     """
-    global PLAYER, MOVE_ID
 
     kafka_consumer = KafkaConsumer("map_engine", bootstrap_servers=KAFKA_SERVER)
-    kafka_producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+
     for message in kafka_consumer:
-        # print(message.value.decode(FORMAT)[-400:])
         map_player = Map(message.value.decode(FORMAT)[-400:])
         clear()
         map_player.print_color()
+
+
+def read_player_cli():
+    """
+    Function to get player parameters
+    """
+    kafka_consumer = KafkaConsumer(
+        "player_{}".format(PLAYER.get_alias().lower()[0]),
+        bootstrap_servers=KAFKA_SERVER,
+    )
+
+    for message in kafka_consumer:
+        map_player = Map(message.value.decode(FORMAT)[-400:])
+        clear()
+        map_player.print_color()
+
+
+def send_move_cli():
+    """
+    Function to get input and send it
+    """
+    global PLAYER, MOVE_ID
+
+    kafka_producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+
+    while True:
         key = input().lower()  # TODO Cambiar a tecla estática
         kafka_producer.send(
             # "move_player_{}".format(PLAYER.get_alias()[0]),
@@ -197,6 +224,40 @@ def play_game():
             )
             .encode(FORMAT),
         )
+
+
+def read_player_cli():
+    """
+    Function to recieve player information
+    """
+    global PLAYER, MOVE_ID
+
+    kafka_consumer = KafkaConsumer(
+        "player_{}".format(PLAYER.get_alias().lower()[0]),
+        bootstrap_servers=KAFKA_SERVER,
+    )
+
+    for msg in kafka_consumer:
+        msg_split = msg.value.decode(FORMAT).split(",")
+        msg_split.pop(0)
+        PLAYER = Player(msg_split)
+
+
+def play_game():
+    """
+    Function to return the map and play the game
+    """
+
+    # thread_read_map_cli = threading.Thread(target=read_map_cli, args=())
+    # thread_read_map_cli.start()
+
+    thread_read_player_cli = threading.Thread(target=read_player_cli, args=())
+    thread_read_player_cli.start()
+
+    thread_send_move_cli = threading.Thread(target=send_move_cli, args=())
+    thread_send_move_cli.start()
+
+    read_map_cli()
 
 
 ########## MAIN ##########

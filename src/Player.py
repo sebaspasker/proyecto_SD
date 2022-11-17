@@ -31,14 +31,22 @@ class Player:
     hot = 0
     dead = False
 
-    def __init__(self, string_list=None):
+    def __init__(self, string_list=None, ddbb=False):
         if string_list is not None:
-            self.set_alias(string_list[0])
-            self.position = (int(string_list[2]), int(string_list[3]))
-            self.set_level(string_list[4])
-            self.set_cold(string_list[5])
-            self.set_hot(string_list[6])
-            self.set_dead(string_list[7])
+            if not ddbb:
+                self.position = (int(string_list[0]), int(string_list[1]))
+                self.set_alias(string_list[2])
+                self.set_level(int(string_list[3]))
+                self.set_hot(int(string_list[4]))
+                self.set_cold(int(string_list[5]))
+                self.set_dead(string_list[6])
+            else:
+                self.set_alias(string_list[0])
+                self.position = (int(string_list[2]), int(string_list[3]))
+                self.set_level(int(string_list[4]))
+                self.set_cold(int(string_list[5]))
+                self.set_hot(int(string_list[6]))
+                self.set_dead(bool(string_list[7]))
 
     def __str__(self):
         return (

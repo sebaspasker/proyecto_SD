@@ -30,6 +30,7 @@ SENDING_MAP = False
 MAP_CREATED = False
 MOVE_RECEIVER = False
 RESOLVING_USER = False
+CHANGE = False
 
 TIME_WAIT_SEC = 1
 
@@ -93,20 +94,16 @@ def actualize_players_position():
     cursor.execute("delete from map_engine;")
     for row in id_rows:
         x, y = random.randint(1, 18), random.randint(1, 18)
-        map_.set_map_matrix(x, y, row[0].lower()[0])
-        save_player_position(connection, cursor, row[0], x, y)
-        cursor.execute(
-            "update players set x = {}, y = {} where alias = '{}'".format(
-                int(x), int(y), row[0]
-            )
-        )
+        if row[0] in players_dict.keys():
+            map_.set_map_matrix(x, y, row[0].lower()[0])
+            save_player_position(connection, cursor, row[0], x, y)
+            players_dict[row[0]].set_position(int(x), int(y))
     connection.commit()
     connection.close()
     save_map(map_)
 
 
 def save_map(map_to_saved):
-    # map_actual = read_map()
     connection = sqlite3.connect(DB_SERVER)
     cursor = connection.cursor()
 
@@ -236,7 +233,7 @@ def read_client(alias, passwd) -> Player:
 
         if player_string:
             if player_string[0] == alias and player_string[1] == passwd:
-                player = Player(player_string)
+                player = Player(player_string, ddbb=True)
                 return player
             else:
                 print("[WARNING] Player not found.")
@@ -251,7 +248,7 @@ def send_map(server=None):
     """
 
     global GAME_STARTED
-    global SENDING_MAP
+    global SENDING_MAP, CHANGE
     GAME_STARTED = True
     SENDING_MAP = True
 
@@ -263,11 +260,15 @@ def send_map(server=None):
     print("[SENDING MAP] Sending map raw char to topic '{}'".format("map_engine"))
 
     while True:
+        # if not CHANGE:
+        #     sleep(2)
+        # else:
+        #     CHANGE = False
+
         map_read = read_map()
 
         try:
             producer.send("map_engine", map_read.to_raw_string().encode(FORMAT))
-            sleep(2)
         except ValueError as VE:
             print("VALUE ERROR: Cerrando engine...")
             print("{}".format(VE.message))
@@ -299,17 +300,21 @@ def process_key(key, position_, player):
     if new_position is None:
         return False
     print("POSITIONS")
+    print(position_)
     print(position)
     print(new_position)
     print(player)
-    act_map.evaluate_move(position, new_position, player)
+    player = act_map.evaluate_move(position, new_position, player)
+    players_dict[player.get_alias()] = player
     if player.get_dead():
         process_player_dead(player)
     print(act_map.print_color())
     save_map(act_map)
+    return player
 
 
 def process_client_msg(msg_):
+    global CHANGE
     msg = msg_.split(",")  # Separate msg by comma
     if msg[0] != "6":
         return False
@@ -319,7 +324,27 @@ def process_client_msg(msg_):
     position = msg[2]  # Different format
     move_id = int(msg[3])
     alias = msg[4]
-    process_key(key, position, players_dict[alias])
+    new_player = process_key(key, position, players_dict[alias])
+
+    if new_player is not False:
+        CHANGE = True
+        producer_player = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+        producer_player.send(
+            "player_{}".format(alias[0].lower()),
+            bytes(
+                dict_sockets()["Player"].format(
+                    x=str(new_player.get_position()[0]),
+                    y=str(new_player.get_position()[1]),
+                    alias=new_player.get_alias(),
+                    level=str(new_player.get_level()),
+                    hot=str(new_player.get_hot()),
+                    cold=str(new_player.get_cold()),
+                    dead=str(new_player.get_dead()),
+                ),
+                FORMAT,
+            ),
+        )
+        players_dict[alias] = new_player
 
 
 def resolve_user(kafka_server=None):

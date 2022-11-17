@@ -202,6 +202,7 @@ class Map:
         self.set_map_matrix(
             new_position[0], old_position[1], player.get_alias().lower()[0]
         )
+        return player
         # self.set_map(old_position[0], old_position[1], 0, None)
         # self.set_map(new_position[0], new_position[1], 1, player)
 
@@ -217,9 +218,13 @@ class Map:
             # self.evaluate_fight(old_position, new_position, player, new_position_class)
             pass
         elif new_position_class == "Mine":
-            self.evaluate_mine(old_position, new_position, player, new_position_class)
+            player = self.evaluate_mine(
+                old_position, new_position, player, new_position_class
+            )
         elif new_position_class == "Food":
-            self.evaluate_food(old_position, new_position, player, new_position_class)
+            player = self.evaluate_food(
+                old_position, new_position, player, new_position_class
+            )
         elif new_position_class == "None":
             # Moves player
             player.set_position(new_position[0], new_position[1])
@@ -227,6 +232,8 @@ class Map:
             self.set_map_matrix(
                 new_position[0], new_position[1], player.get_alias().lower()[0]
             )
+
+        return player
 
         # if get_city(old_position) != get_city(new_position):
         # TODO
