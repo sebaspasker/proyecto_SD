@@ -183,19 +183,19 @@ def play_game():
         # print(message.value.decode(FORMAT)[-400:])
         map_player = Map(message.value.decode(FORMAT)[-400:])
         clear()
-        print("Selecciona arriba/izquierda/derecha/abajo: (w/a/s/d)")
         map_player.print_color()
-        key = input()  # TODO Cambiar a tecla estática
+        key = input().lower()  # TODO Cambiar a tecla estática
         kafka_producer.send(
-            "move_player_{}".format(PLAYER.get_alias()[0]),
-            bytes(
-                dict_sockets()["Move"].format(
-                    key=key,
-                    move_id=MOVE_ID,
-                    position=position_str(PLAYER.get_position()),
-                ),
-                FORMAT,
-            ),
+            # "move_player_{}".format(PLAYER.get_alias()[0]),
+            "move_player",
+            dict_sockets()["Move"]
+            .format(
+                key=key,
+                move_id=MOVE_ID,
+                position=position_str(PLAYER.get_position()),
+                alias=PLAYER.get_alias(),
+            )
+            .encode(FORMAT),
         )
 
 

@@ -29,13 +29,16 @@ WAIT_STARTED = False
 SENDING_MAP = False
 MAP_CREATED = False
 MOVE_RECEIVER = False
+RESOLVING_USER = False
 
-TIME_WAIT_SEC = 20
+TIME_WAIT_SEC = 1
 
 last_id_msg = {}  # Last id for message client
 
 sys.path.append("src")
 sys.path.append("src/exceptions")
+
+players_dict = {}
 
 
 def connect_db(name=None):
@@ -263,7 +266,7 @@ def send_map(server=None):
         map_read = read_map()
 
         try:
-            producer.send("map_engine", bytes(map_read.to_raw_string(), "utf-8"))
+            producer.send("map_engine", map_read.to_raw_string().encode(FORMAT))
             sleep(2)
         except ValueError as VE:
             print("VALUE ERROR: Cerrando engine...")
@@ -295,6 +298,10 @@ def process_key(key, position_, player):
     new_position = see_new_position(position, key)
     if new_position is None:
         return False
+    print("POSITIONS")
+    print(position)
+    print(new_position)
+    print(player)
     act_map.evaluate_move(position, new_position, player)
     if player.get_dead():
         process_player_dead(player)
@@ -302,27 +309,24 @@ def process_key(key, position_, player):
     save_map(act_map)
 
 
-def process_client_msg(msgs, player):
-    global last_id_msg
-
-    Alias = player.get_alias()[0]
-
-    for msg_ in msgs[-5:]:  # Separated msgs by spaces
-        msg = msg_.split(",")  # Separate msg by comma
-        if msg[0] != "6":
-            pass
-        if int(msg[3]) <= last_id_msg[Alias]:
-            pass
-        key = msg[1]
-        position = msg[2]  # Different format
-        process_key(key, position, player)
+def process_client_msg(msg_):
+    msg = msg_.split(",")  # Separate msg by comma
+    if msg[0] != "6":
+        return False
+    # if int(msg[3]) <= last_id_msg[Alias]:
+    #     return False
+    key = msg[1]
+    position = msg[2]  # Different format
+    move_id = int(msg[3])
+    alias = msg[4]
+    process_key(key, position, players_dict[alias])
 
 
-def resolve_user(player, kafka_server=None):
-    global last_id_msg
-    global MOVE_RECEIVER
+def resolve_user(kafka_server=None):
+    global players_dict
+    global MOVE_RECEIVER, RESOLVING_USER
 
-    last_id_msg[player.get_alias()[0]] = 0
+    RESOLVING_USER = True
 
     producer = (
         KafkaProducer(bootstrap_servers=KAFKA_SERVER)
@@ -340,14 +344,14 @@ def resolve_user(player, kafka_server=None):
     if MOVE_RECEIVER is False:
         MOVE_RECEIVER = True
         consumer = KafkaConsumer(
-            "move_player_{}".format(player.get_alias()[0]),
+            # "move_player_{}".format(player.get_alias()[0]),
+            "move_player",
             bootstrap_servers=KAFKA_SERVER,
         )
 
         for msg in consumer:
-            msg_split = msg.value.decode(FORMAT).split(" ")
             thread_process_client_msg = threading.Thread(
-                target=process_client_msg, args=(msg_split, player)
+                target=process_client_msg, args=[msg.value.decode(FORMAT)]
             )
             thread_process_client_msg.start()
 
@@ -369,7 +373,7 @@ def handle_client(connection, address):
     Handle client connection to login, start the game and play.
     """
 
-    global CONNECTED
+    global CONNECTED, players_dict
 
     print("[NEW CONEXION] {} connected.".format(connection))
 
@@ -383,6 +387,7 @@ def handle_client(connection, address):
             params_msg = msg.split(",")
             if params_msg[0] == "3":
                 player = read_client(params_msg[1], params_msg[2])
+                players_dict[player.get_alias()] = player
                 if player is not None:
                     print(
                         "[LOGIN] User with IP {} and alias {} have logged in.".format(
@@ -409,7 +414,8 @@ def handle_client(connection, address):
                             sleep(1)
 
                     # Resolve the user to play the game
-                    resolve_user(player)
+                    if not RESOLVING_USER:
+                        resolve_user()
                 else:
                     print("[LOGIN ERROR] User with IP {} could not login.")
                     connection.send(dict_sockets()["Incorrect"].encode(FORMAT))
