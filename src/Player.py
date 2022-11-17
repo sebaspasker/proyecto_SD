@@ -48,7 +48,7 @@ class Player:
             + "Level: {}\n".format(self.get_level())
             + "Cold: {}\n".format(self.get_cold())
             + "Hot: {}\n".format(self.get_hot())
-            + "Dead: {}\n".format(self.get_deat())
+            + "Dead: {}\n".format(self.get_dead())
             + "-----------------\n"
         )
 
