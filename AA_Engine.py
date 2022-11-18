@@ -98,6 +98,8 @@ def actualize_players_position():
             map_.set_map_matrix(x, y, row[0].lower()[0])
             save_player_position(connection, cursor, row[0], x, y)
             players_dict[row[0]].set_position(int(x), int(y))
+            print(players_dict[row[0]])
+
     connection.commit()
     connection.close()
     save_map(map_)
@@ -305,9 +307,10 @@ def process_key(key, position_, player):
     print(new_position)
     print(player)
     player = act_map.evaluate_move(position, new_position, player)
-    players_dict[player.get_alias()] = player
-    if player.get_dead():
-        process_player_dead(player)
+    if player is not None:
+        players_dict[player.get_alias()] = player
+        if player.get_dead():
+            process_player_dead(player)
     print(act_map.print_color())
     save_map(act_map)
     return player
