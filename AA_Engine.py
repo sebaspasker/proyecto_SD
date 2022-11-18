@@ -31,6 +31,7 @@ MAP_CREATED = False
 MOVE_RECEIVER = False
 RESOLVING_USER = False
 CHANGE = False
+RESET_VALUES = False
 
 TIME_WAIT_SEC = 20
 
@@ -40,6 +41,7 @@ sys.path.append("src")
 sys.path.append("src/exceptions")
 
 players_dict = {}
+dead_list = []
 
 
 def connect_db(name=None):
@@ -52,6 +54,17 @@ def connect_db(name=None):
     else:
         connection = sqlite3.connect(name)
         return sqlite3.connect(name).cursor(), connection
+
+
+def reset_values():
+    """
+    Reset values of the ddbb.
+    """
+
+    cursor, connection = connect_db()
+    cursor.execute("update players set dead = 0, level = 0, ec = 0, ef = 0;")
+    connection.commit()
+    connection.close()
 
 
 def create_map():
@@ -213,7 +226,7 @@ def recieve_map(server):
             "[RECIEVING MAP] Recieved map raw char in topic '{}'".format("map_engine")
         )
 
-    except ValuerError as VE:
+    except ValueError as VE:
         print("VALUE ERROR: Cerrando engine...")
         print("{}".format(VE.message))
     except KeyboardInterrupt:
@@ -235,6 +248,7 @@ def read_client(alias, passwd) -> Player:
         if player_string:
             if player_string[0] == alias and player_string[1] == passwd:
                 player = Player(player_string, ddbb=True)
+                player.set_dead(False)
                 return player
             else:
                 print("[WARNING] Player not found.")
@@ -295,16 +309,20 @@ def see_new_position(position, key):
         return None
 
 
-def process_player_dead(player):
-    pass  # TODO
-
-
 def send_player(alias):
+    global CHANGE
+
     kafka_producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
 
     player = players_dict[alias]
     while True:
-        sleep(2)
+        i = 0
+        while not CHANGE:
+            sleep(0.05)
+            i += 1
+            if i == 20:
+                break
+        CHANGE = False
         kafka_producer.send(
             "player_{}".format(alias[0].lower()),
             dict_sockets()["Player"]
@@ -321,6 +339,11 @@ def send_player(alias):
         )
 
 
+def process_player_dead(player):
+    global dead_list
+    dead_list.append(player.get_alias())
+
+
 def process_key(key, position_, player):
     global CHANGE
     act_map = read_map()
@@ -328,12 +351,8 @@ def process_key(key, position_, player):
     new_position = see_new_position(position, key)
     if new_position is None:
         return False
-    print("POSITIONS")
-    print(position_)
-    print(position)
-    print(new_position)
-    print(player)
     player = act_map.evaluate_move(position, new_position, player)
+    print(player)
     if player is not None:
         players_dict[player.get_alias()] = player
         if player.get_dead():
@@ -354,6 +373,8 @@ def process_client_msg(msg_):
     position = msg[2]  # Different format
     move_id = int(msg[3])
     alias = msg[4]
+    if alias in dead_list:
+        return None
     new_player = process_key(key, position, players_dict[alias])
 
     if new_player is not False and new_player is not None:
@@ -426,11 +447,14 @@ def handle_client(connection, address):
     Handle client connection to login, start the game and play.
     """
 
-    global CONNECTED, players_dict
+    global CONNECTED, players_dict, RESET_VALUES
 
     print("[NEW CONEXION] {} connected.".format(connection))
 
     connected = True
+    if not RESET_VALUES:
+        RESET_VALUES = True
+        reset_values()
     while connected:
         msg = connection.recv(HEADER).decode(FORMAT)
         if msg:

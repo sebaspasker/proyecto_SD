@@ -21,6 +21,9 @@ LOGIN_ID = -1
 PLAYER = Player()
 MOVE_ID = 1
 
+DEAD = False
+GAME_STARTED = False
+
 
 # Función para enviar mensajes cliente
 def send(msg, client):
@@ -146,6 +149,7 @@ def login(client):
         print("Logueado correctamente al servidor.")
         ply_sck = client.recv(2048).decode(FORMAT)
         PLAYER = process_player(ply_sck)
+        PLAYER.set_dead(False)
         start_game(KAFKA_SERVER)
     else:
         print("No se ha podido loguear al servidor.")
@@ -176,6 +180,20 @@ def start_game(server_kafka):
             play_game()
 
 
+def dead():
+    while True:
+        sleep(2)
+        clear()
+        print("--------------------------------------------------------")
+        print("-------------                      ---------------------")
+        print("------------- -------------------- ---------------------")
+        print("------------- -----   HA   ------- ---------------------")
+        print("------------- ----- MUERTO ------- ---------------------")
+        print("------------- -------------------- ---------------------")
+        print("-------------                      ---------------------")
+        print("--------------------------------------------------------")
+
+
 def read_map_cli():
     """
     Function to read and print a map
@@ -188,20 +206,8 @@ def read_map_cli():
         clear()
         map_player.print_color()
 
-
-def read_player_cli():
-    """
-    Function to get player parameters
-    """
-    kafka_consumer = KafkaConsumer(
-        "player_{}".format(PLAYER.get_alias().lower()[0]),
-        bootstrap_servers=KAFKA_SERVER,
-    )
-
-    for message in kafka_consumer:
-        map_player = Map(message.value.decode(FORMAT)[-400:])
-        clear()
-        map_player.print_color()
+        if DEAD:
+            break
 
 
 def send_move_cli():
@@ -226,6 +232,9 @@ def send_move_cli():
             .encode(FORMAT),
         )
 
+        if DEAD:
+            break
+
 
 def read_player_cli():
     """
@@ -242,17 +251,34 @@ def read_player_cli():
         msg_split = msg.value.decode(FORMAT).split(",")
         msg_split.pop(0)
         PLAYER = Player(msg_split)
+        print(PLAYER)
+        if DEAD:
+            break
+
+
+def comprobe_dead():
+    global PLAYER, DEAD
+    sleep(10)
+    while True:
+        if PLAYER.get_dead():
+            DEAD = True
+            dead()
+            break
 
 
 def play_game():
     """
     Function to return the map and play the game
     """
+    GAME_STARTED = True
     # thread_read_map_cli = threading.Thread(target=read_map_cli, args=())
     # thread_read_map_cli.start()
 
     thread_send_move_cli = threading.Thread(target=send_move_cli, args=())
     thread_send_move_cli.start()
+
+    thread_comprobe_dead = threading.Thread(target=comprobe_dead, args=())
+    thread_comprobe_dead.start()
 
     read_map_cli()
 

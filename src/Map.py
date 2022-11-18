@@ -191,6 +191,7 @@ class Map:
         player.set_dead(True)
         self.set_map_matrix(old_position[0], old_position[1], " ")
         self.set_map_matrix(new_position[0], new_position[1], " ")
+        return player
 
     def evaluate_food(self, old_position, new_position, player, food):
         if player.get_level() < 10:
