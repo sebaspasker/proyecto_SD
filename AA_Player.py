@@ -170,6 +170,8 @@ def start_game(server_kafka):
         elif msg_split[-3:][1] == "Start_Game":
             clear()
             print("GAME STARTS WITH {} USERS".format(msg_split[-3:][2]))
+            thread_read_player_cli = threading.Thread(target=read_player_cli, args=())
+            thread_read_player_cli.start()
             sleep(3)
             play_game()
 
@@ -213,7 +215,6 @@ def send_move_cli():
     while True:
         key = input().lower()  # TODO Cambiar a tecla estática
         kafka_producer.send(
-            # "move_player_{}".format(PLAYER.get_alias()[0]),
             "move_player",
             dict_sockets()["Move"]
             .format(
@@ -247,12 +248,8 @@ def play_game():
     """
     Function to return the map and play the game
     """
-
     # thread_read_map_cli = threading.Thread(target=read_map_cli, args=())
     # thread_read_map_cli.start()
-
-    thread_read_player_cli = threading.Thread(target=read_player_cli, args=())
-    thread_read_player_cli.start()
 
     thread_send_move_cli = threading.Thread(target=send_move_cli, args=())
     thread_send_move_cli.start()

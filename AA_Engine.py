@@ -32,7 +32,7 @@ MOVE_RECEIVER = False
 RESOLVING_USER = False
 CHANGE = False
 
-TIME_WAIT_SEC = 1
+TIME_WAIT_SEC = 20
 
 last_id_msg = {}  # Last id for message client
 
@@ -74,10 +74,10 @@ def create_map():
     # Actualiza y mete los jugadores activos en el mapa
     actualize_players_position()
 
+    map_p = read_map()
+
     connection.commit()
     connection.close()
-    global MAP_CREATED
-    MAP_CREATED = True
 
 
 def save_player_position(connection, cursor, alias, x, y):
@@ -98,7 +98,6 @@ def actualize_players_position():
             map_.set_map_matrix(x, y, row[0].lower()[0])
             save_player_position(connection, cursor, row[0], x, y)
             players_dict[row[0]].set_position(int(x), int(y))
-            print(players_dict[row[0]])
 
     connection.commit()
     connection.close()
@@ -266,9 +265,14 @@ def send_map(server=None):
         #     sleep(2)
         # else:
         #     CHANGE = False
-
+        i = 0
+        while not CHANGE:
+            sleep(0.05)
+            i += 1
+            if i == 20:
+                break
+        CHANGE = False
         map_read = read_map()
-
         try:
             producer.send("map_engine", map_read.to_raw_string().encode(FORMAT))
         except ValueError as VE:
@@ -295,7 +299,30 @@ def process_player_dead(player):
     pass  # TODO
 
 
+def send_player(alias):
+    kafka_producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+
+    player = players_dict[alias]
+    while True:
+        sleep(2)
+        kafka_producer.send(
+            "player_{}".format(alias[0].lower()),
+            dict_sockets()["Player"]
+            .format(
+                alias=alias,
+                x=str(player.get_position()[0]),
+                y=str(player.get_position()[1]),
+                level=str(player.get_level()),
+                hot=str(player.get_hot()),
+                cold=str(player.get_cold()),
+                dead=str(player.get_dead()),
+            )
+            .encode(FORMAT),
+        )
+
+
 def process_key(key, position_, player):
+    global CHANGE
     act_map = read_map()
     position = process_position(position_)
     new_position = see_new_position(position, key)
@@ -311,13 +338,13 @@ def process_key(key, position_, player):
         players_dict[player.get_alias()] = player
         if player.get_dead():
             process_player_dead(player)
-    print(act_map.print_color())
     save_map(act_map)
+    if player is not None:
+        CHANGE = True
     return player
 
 
 def process_client_msg(msg_):
-    global CHANGE
     msg = msg_.split(",")  # Separate msg by comma
     if msg[0] != "6":
         return False
@@ -329,8 +356,7 @@ def process_client_msg(msg_):
     alias = msg[4]
     new_player = process_key(key, position, players_dict[alias])
 
-    if new_player is not False:
-        CHANGE = True
+    if new_player is not False and new_player is not None:
         producer_player = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
         producer_player.send(
             "player_{}".format(alias[0].lower()),
@@ -351,7 +377,6 @@ def process_client_msg(msg_):
 
 
 def resolve_user(kafka_server=None):
-    global players_dict
     global MOVE_RECEIVER, RESOLVING_USER
 
     RESOLVING_USER = True
@@ -443,6 +468,10 @@ def handle_client(connection, address):
 
                     # Resolve the user to play the game
                     if not RESOLVING_USER:
+                        thread_send_player = threading.Thread(
+                            target=send_player, args=[player.get_alias()]
+                        )
+                        thread_send_player.start()
                         resolve_user()
                 else:
                     print("[LOGIN ERROR] User with IP {} could not login.")
