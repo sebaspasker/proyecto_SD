@@ -10,7 +10,6 @@ from src.utils.Sockets_dict import dict_sockets
 from src.utils.Sockets_dict import dict_send_error
 from src.utils.Process_position import process_position
 from kafka import KafkaProducer, KafkaConsumer
-from waiting import wait
 
 FORMAT = "utf-8"
 KAFKA_SERVER = "127.0.0.2:9092"
@@ -275,6 +274,13 @@ def read_client(alias, passwd) -> Player:
     return None
 
 
+def wait_until_change():
+    global CHANGE
+    while True:
+        if CHANGE:
+            return True
+
+
 def send_map(server=None):
     """
     Sends a map with kafka to 'map_engine' topic.
@@ -293,14 +299,10 @@ def send_map(server=None):
     print("[SENDING MAP] Sending map raw char to topic '{}'".format("map_engine"))
 
     while True:
-        # if not CHANGE:
-        #     sleep(2)
-        # else:
-        #     CHANGE = False
-        sleep(0.05)
-        map_read = read_map()
+        wait_until_change()
         try:
-            producer.send("map_engine", map_read.to_raw_string().encode(FORMAT))
+            producer.send("map_engine", MAP.to_raw_string().encode(FORMAT))
+            CHANGE = False
         except ValueError as VE:
             print("VALUE ERROR: Cerrando engine...")
             print("{}".format(VE.message))
@@ -549,7 +551,7 @@ def process_new_position(position, key):
 
 
 def process_key_client(alias, key):
-    global MAP
+    global MAP, CHANGE
     if alias not in players_dict.keys():
         return False
 
@@ -557,7 +559,7 @@ def process_key_client(alias, key):
     position = MAP.search_player(alias)
     new_position = process_new_position(position, key)
     MAP.evaluate_move(position, new_position, player)
-    MAP.print_color()
+    CHANGE = True
     # TODO Crear función empty map, función random player position in map,
     # función distribute players_dict in map random y ver como se mueve vacío
 

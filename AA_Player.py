@@ -181,8 +181,8 @@ def wait_user():
 def start_game():
     wait_user()
 
-    # thread_read_map_cli = threading.Thread(target=read_map_cli, args=())
-    # thread_read_map_cli.start()
+    thread_read_map_cli = threading.Thread(target=read_map_cli, args=())
+    thread_read_map_cli.start()
 
     # thread_read_player_cli = threading.Thread(target=read_player_cli, args=())
     # thread_read_player_cli.start()
@@ -260,12 +260,13 @@ def send_move_cli():
         while val.lower() != "q":
             # key = input().lower()  # TODO Cambiar a tecla estática
             key = term.inkey()
-            kafka_producer.send(
-                "keys",
-                "{alias},{key}".format(alias=PLAYER.get_alias(), key=key).encode(
-                    FORMAT
-                ),
-            )
+            if key == "w" or key == "s" or key == "a" or key == "d":
+                kafka_producer.send(
+                    "keys",
+                    "{alias},{key}".format(alias=PLAYER.get_alias(), key=key).encode(
+                        FORMAT
+                    ),
+                )
 
 
 def read_player_cli():
@@ -295,6 +296,7 @@ def comprobe_dead():
             break
 
 
+@DeprecationWarning
 def play_game():
     """
     Function to return the map and play the game
