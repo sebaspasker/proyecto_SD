@@ -79,6 +79,19 @@ class Map:
 
         return map_str
 
+    def search_player(self, alias):
+        char = alias[0].lower()
+        for i, row in zip(range(len(self.map_matrix)), self.map_matrix):
+            if char in row:
+                return (i, row.index(char))
+        return (-1, -1)
+
+    def empty_map(self):
+        self.map_matrix = [[" " for x in range(0, 20)] for i in range(0, 20)]
+
+    def player_random_position(self, player):
+        self.map_matrix[randint(0, 19)][randint(0, 19)] = player.get_alias()[0].lower()
+
     def raw_string_to_matrix(self, map_string):
         """
         Converts a raw varchar(400) in the map_matrix.
@@ -113,7 +126,7 @@ class Map:
         """
         map_string = self.__str__()
         for char in map_string:
-            if char >= "0" and char <= "9":
+            if char >= "a" and char <= "z":
                 prYellow(char)
             elif char == "M":
                 prRed(char)
@@ -207,7 +220,15 @@ class Map:
         # self.set_map(old_position[0], old_position[1], 0, None)
         # self.set_map(new_position[0], new_position[1], 1, player)
 
-    def evaluate_move(self, old_position, new_position, player):
+    def evaluate_space(self, old_position, new_position, player):
+        self.set_map_matrix(old_position[0], old_position[1], " ")
+        self.set_map_matrix(
+            new_position[0], new_position[1], player.get_alias().lower()[0]
+        )
+
+    @DeprecationWarning
+    def evaluate_move_old(self, old_position, new_position, player):
+        print(old_position, new_position)
 
         # Evaluate what is in the new position
         new_position_class = self.evaluate_position(new_position)
@@ -235,6 +256,11 @@ class Map:
             )
 
         return player
+
+    def evaluate_move(self, old_position, new_position, player):
+        # new_position_object = self.evaluate_position(new_position)
+        # if position == "None":
+        self.evaluate_space(old_position, new_position, player)
 
         # if get_city(old_position) != get_city(new_position):
         # TODO

@@ -9,5 +9,11 @@ def dict_sockets():
         "Start": "5,Start,{connected}",  # Waits until game creates
         "Start_Waiting": "5,Waiting,{connected}",
         "Move": "6,{key},{position},{move_id},{alias}",  # Player Move
-        "Player": "7,{x},{y},{alias},{level},{hot},{cold},{dead}",  # Player infomation
+        "Player": "7,{alias},{level},{hot},{cold},{dead}",  # Player infomation
+    }
+
+
+def dict_send_error():
+    return {
+        "Format_error": "-1,Format connection error, retry connection.",
     }

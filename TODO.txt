@@ -1,1 +1,3 @@
 scripts de path kafka y zookeeper y ejecucion para ejecutar en clase
+Manejo de variables desde lista de comandos
+Manejo de conectados con kafka conectado? respuesta

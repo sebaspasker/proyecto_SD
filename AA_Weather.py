@@ -6,7 +6,7 @@ import sqlite3
 
 # Variables globales constantes
 HEADER = 64
-SERVER = "127.0.0.1"
+SERVER = "172.27.178.146"
 FORMAT = "utf-8"
 FIN = "FIN"
 
