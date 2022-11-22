@@ -7,22 +7,25 @@ from time import sleep
 from src.Map import Map
 from src.Player import Player
 from src.utils.Sockets_dict import dict_sockets
+from src.utils.Sockets_dict import dict_send_error
 from src.utils.Process_position import process_position
 from kafka import KafkaProducer, KafkaConsumer
+from waiting import wait
 
 FORMAT = "utf-8"
 KAFKA_SERVER = "127.0.0.2:9092"
+# KAFKA_SERVER = "172.27.203.240:9092"
 DB_SERVER = "againstall.db"
 
-# IP_SOCKET = "127.0.0.2"
 IP_SOCKET = "127.0.0.2"
+# IP_SOCKET = "172.27.203.240"
 PUERTO_SOCKET = 5050
-
 HEADER = 64
 FORMAT = "utf-8"
 
 MAX_USERS = 4
 CONNECTED = 0
+MAP = Map()
 
 GAME_STARTED = False
 WAIT_STARTED = False
@@ -32,6 +35,7 @@ MOVE_RECEIVER = False
 RESOLVING_USER = False
 CHANGE = False
 RESET_VALUES = False
+WAIT_USER = True
 
 TIME_WAIT_SEC = 20
 
@@ -42,6 +46,17 @@ sys.path.append("src/exceptions")
 
 players_dict = {}
 dead_list = []
+
+###### UTILS ###########
+# TODO
+
+# UTILS KAFKA
+
+# UTILS SOCKETS
+
+# UTILS DB
+
+########################
 
 
 def connect_db(name=None):
@@ -76,6 +91,8 @@ def create_map():
 
     global map_engine
     map_engine = Map()
+    # TODO cambiar
+    map_engine.empty_map()
 
     connection = sqlite3.connect(DB_SERVER)
     cursor = connection.cursor()
@@ -85,9 +102,11 @@ def create_map():
     save_map(map_engine)
 
     # Actualiza y mete los jugadores activos en el mapa
-    actualize_players_position()
+    # actualize_players_position()
 
-    map_p = read_map()
+    # map_p = read_map()
+    global MAP
+    MAP = read_map()
 
     connection.commit()
     connection.close()
@@ -248,7 +267,6 @@ def read_client(alias, passwd) -> Player:
         if player_string:
             if player_string[0] == alias and player_string[1] == passwd:
                 player = Player(player_string, ddbb=True)
-                player.set_dead(False)
                 return player
             else:
                 print("[WARNING] Player not found.")
@@ -279,13 +297,7 @@ def send_map(server=None):
         #     sleep(2)
         # else:
         #     CHANGE = False
-        i = 0
-        while not CHANGE:
-            sleep(0.05)
-            i += 1
-            if i == 20:
-                break
-        CHANGE = False
+        sleep(0.05)
         map_read = read_map()
         try:
             producer.send("map_engine", map_read.to_raw_string().encode(FORMAT))
@@ -309,6 +321,7 @@ def see_new_position(position, key):
         return None
 
 
+@DeprecationWarning
 def send_player(alias):
     global CHANGE
 
@@ -328,8 +341,6 @@ def send_player(alias):
             dict_sockets()["Player"]
             .format(
                 alias=alias,
-                x=str(player.get_position()[0]),
-                y=str(player.get_position()[1]),
                 level=str(player.get_level()),
                 hot=str(player.get_hot()),
                 cold=str(player.get_cold()),
@@ -339,12 +350,14 @@ def send_player(alias):
         )
 
 
+@DeprecationWarning
 def process_player_dead(player):
     global dead_list
     dead_list.append(player.get_alias())
 
 
-def process_key(key, position_, player):
+@DeprecationWarning
+def process_key_old(key, position_, player):
     global CHANGE
     act_map = read_map()
     position = process_position(position_)
@@ -352,7 +365,7 @@ def process_key(key, position_, player):
     if new_position is None:
         return False
     player = act_map.evaluate_move(position, new_position, player)
-    print(player)
+    # print(player)
     if player is not None:
         players_dict[player.get_alias()] = player
         if player.get_dead():
@@ -363,6 +376,7 @@ def process_key(key, position_, player):
     return player
 
 
+@DeprecationWarning
 def process_client_msg(msg_):
     msg = msg_.split(",")  # Separate msg by comma
     if msg[0] != "6":
@@ -397,7 +411,8 @@ def process_client_msg(msg_):
         players_dict[alias] = new_player
 
 
-def resolve_user(kafka_server=None):
+@DeprecationWarning
+def resolve_user_old(kafka_server=None):
     global MOVE_RECEIVER, RESOLVING_USER
 
     RESOLVING_USER = True
@@ -430,6 +445,17 @@ def resolve_user(kafka_server=None):
             thread_process_client_msg.start()
 
 
+def string_format_player(player):
+    return dict_sockets()["Player"].format(
+        alias=player.get_alias(),
+        level=str(player.get_level()),
+        hot=str(player.get_hot()),
+        cold=str(player.get_cold()),
+        dead=str(player.get_dead()),
+    )
+
+
+@DeprecationWarning
 def string_socket_format_player(player):
     return dict_sockets()["Player"].format(
         x=str(player.get_position()[0]),
@@ -442,7 +468,130 @@ def string_socket_format_player(player):
     )
 
 
+def login_client(connection, address):
+    """
+    Handle client login
+    """
+    while True:
+        msg = connection.recv(HEADER).decode(FORMAT)
+        if msg:
+            params_login = msg.split(",")
+            if params_login[0] == "3":
+                player = read_client(params_login[1], params_login[2])
+                if player is not None:
+                    player.reset_game()
+                    players_dict[player.get_alias()] = player
+                    connection.send(dict_sockets()["Correct"].encode(FORMAT))
+                    connection.send(string_format_player(player).encode(FORMAT))
+                    print(
+                        "[LOGIN] User with IP {} and alias {} have logged in.".format(
+                            address[0], player.get_alias()
+                        )
+                    )
+
+                    return player.get_alias()
+                else:
+                    print("[LOGIN ERROR] User with IP {} could not login.")
+                    connection.send(dict_sockets()["Incorrect"].encode(FORMAT))
+
+
+def random_player_distribution():
+    global MAP
+    for player in players_dict.values():
+        MAP.player_random_position(player)
+
+
+def send_kafka(producer, topic, time, number, message):
+    """
+    Send msg a number of times by a kafka producer with a time sleep.
+    """
+    for i in range(0, number):
+        producer.send(topic, message.encode(FORMAT))
+        sleep(time)
+
+
+def wait_client():
+    while True:
+        sleep(1)
+        if WAIT_USER is False:
+            break
+
+
+def wait_server():
+    global WAIT_USER
+    print("[WAIT SERVER] Wait server started. Seconds: {}...".format(TIME_WAIT_SEC))
+    producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+    producer.send("wait", "True".encode(FORMAT))
+    for i in range(0, TIME_WAIT_SEC):
+        producer.send("wait", "True".encode(FORMAT))
+        sleep(1)
+        if i == 50:
+            send_map()
+    WAIT_USER = False
+    # Start sending Kafa stop wait
+    threading.Thread(target=send_kafka, args=(producer, "wait", 1, 10, "False")).start()
+    # Start sending map
+    threading.Thread(target=send_map, args=()).start()
+    # Start recieving keys
+    threading.Thread(target=recieve_key_clients, args=()).start()
+    random_player_distribution()
+
+
+def process_new_position(position, key):
+    if key == "w":
+        return ((position[0] - 1) if position[0] - 1 >= 0 else 19, position[1])
+    elif key == "s":
+        return ((position[0] + 1) % 20, position[1])
+    elif key == "a":
+        return (position[0], (position[1] - 1) if position[1] - 1 >= 0 else 19)
+    elif key == "d":
+        return (position[0], (position[1] + 1) % 20)
+
+
+def process_key_client(alias, key):
+    global MAP
+    if alias not in players_dict.keys():
+        return False
+
+    player = players_dict[alias]
+    position = MAP.search_player(alias)
+    new_position = process_new_position(position, key)
+    MAP.evaluate_move(position, new_position, player)
+    MAP.print_color()
+    # TODO Crear función empty map, función random player position in map,
+    # función distribute players_dict in map random y ver como se mueve vacío
+
+
+def recieve_key_clients():
+    print("[RECIEVING KEYS] Recieving keys from clients.")
+    consumer = KafkaConsumer("keys", bootstrap_servers=KAFKA_SERVER)
+    for msg in consumer:
+        msg_ = msg.value.decode(FORMAT).split(",")
+        alias = msg_[0]
+        key = msg_[1]
+        process_key_client(alias, key)
+
+
+def send_dict_players():
+    while True:
+        sleep(1)
+        for key in dict_players.keys:
+            pass
+            # producer.send(bootstrap_servers=KAFKA_SERVER)
+            # TODO
+
+
 def handle_client(connection, address):
+    print("[NEW CONEXION] {} connected.".format(connection))
+    alias = login_client(connection, address)
+
+    wait_client()
+
+    print("START GAME")
+
+
+@DeprecationWarning
+def handle_client_old(connection, address):
     """
     Handle client connection to login, start the game and play.
     """
@@ -458,9 +607,6 @@ def handle_client(connection, address):
     while connected:
         msg = connection.recv(HEADER).decode(FORMAT)
         if msg:
-            msg_length = len(msg)
-            msg = conn.recv(msg_length).decode(FORMAT)
-
             params_msg = msg.split(",")
             if params_msg[0] == "3":
                 player = read_client(params_msg[1], params_msg[2])
@@ -502,6 +648,21 @@ def handle_client(connection, address):
                     connection.send(dict_sockets()["Incorrect"].encode(FORMAT))
 
 
+def server_socket():
+    ADDR_SOCKET = (IP_SOCKET, PUERTO_SOCKET)
+
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_socket.bind(ADDR_SOCKET)
+    print(
+        "[LISTENING] Escuchando AA_Engine Socket Server en {} puerto {}".format(
+            IP_SOCKET, PUERTO_SOCKET
+        )
+    )
+
+    return server_socket
+
+
 # TODO Seguramente en el handle client -> Solo uno acepta los movimientos
 # TODO Al moverse no se mueve bien el usuario
 # TODO Maps hay veces que no borra el movimiento anterior
@@ -513,24 +674,18 @@ if len(sys.argv) == 1:
     #     MAXJUGADORES = 3
     #     PUERTO_WEATHER = 8080
     #     ADDR = (IP, PUERTO_WEATHER)
-    ADDR_SOCKET = (IP_SOCKET, PUERTO_SOCKET)
 
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.bind(ADDR_SOCKET)
     print("[STARTING] Inicializando AA_Engine Socket Server")
-    server_socket.listen()
-    print(
-        "[LISTENING] Escuchando AA_Engine Socket Server en {} puerto {}".format(
-            IP_SOCKET, PUERTO_SOCKET
-        )
-    )
 
+    threading.Thread(target=create_map, args=()).start()  # Creamos mapa
+    threading.Thread(target=wait_server, args=()).start()
+
+    server_socket = server_socket()
+    server_socket.listen()
     while True:
         conn, addr = server_socket.accept()
 
         thread_login = threading.Thread(target=handle_client, args=(conn, addr))
-        print(KAFKA_SERVER)
         thread_login.start()
 
     server.close()

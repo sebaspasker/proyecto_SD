@@ -24,7 +24,7 @@ def fight(player_1, player_2):
 
 
 class Player:
-    position = (1, 1)
+    # position = (1, 1)
     alias = ""
     level = 0
     cold = 0
@@ -34,25 +34,23 @@ class Player:
     def __init__(self, string_list=None, ddbb=False):
         if string_list is not None:
             if not ddbb:
-                self.position = (int(string_list[0]), int(string_list[1]))
-                self.set_alias(string_list[2])
-                self.set_level(int(string_list[3]))
-                self.set_hot(int(string_list[4]))
-                self.set_cold(int(string_list[5]))
-                self.set_dead(string_list[6])
+                self.set_alias(string_list[0])
+                self.set_level(int(string_list[1]))
+                self.set_hot(int(string_list[2]))
+                self.set_cold(int(string_list[3]))
+                self.set_dead(string_list[4])
             else:
                 self.set_alias(string_list[0])
-                self.position = (int(string_list[2]), int(string_list[3]))
-                self.set_level(int(string_list[4]))
-                self.set_cold(int(string_list[5]))
-                self.set_hot(int(string_list[6]))
-                self.set_dead(bool(string_list[7]))
+                self.set_level(int(string_list[3]))
+                self.set_cold(int(string_list[4]))
+                self.set_hot(int(string_list[5]))
+                self.set_dead(bool(string_list[6]))
 
     def __str__(self):
         return (
             "Player alias: {}\n".format(self.set_alias)
             + "-----------------\n"
-            + "Position: {}\n".format(self.get_position())
+            # + "Position: {}\n".format(self.get_position())
             + "Level: {}\n".format(self.get_level())
             + "Cold: {}\n".format(self.get_cold())
             + "Hot: {}\n".format(self.get_hot())
@@ -60,12 +58,19 @@ class Player:
             + "-----------------\n"
         )
 
+    def reset_game(self):
+        self.set_dead(False)
+        self.set_level(0)
+        self.set_hot(0)
+        self.set_cold(0)
+
     def fight(self, player_2):
         """
         Fight with a oponent. Uses fight(player1, player2) function.
         """
         return fight(self, player_2)
 
+    @DeprecationWarning
     def move(self, x, y):
         """
         Move to a adjacent position. Must be a range between -1 and 1.
@@ -98,6 +103,7 @@ class Player:
 
     # SETTERS
 
+    @DeprecationWarning
     def set_position(self, x=None, y=None, move=False):
         if x is not None:
             if x <= 19 and x >= 0 and y <= 19 and y >= 0:
@@ -142,6 +148,7 @@ class Player:
 
     # GETTERS
 
+    @DeprecationWarning
     def get_position(self):
         return self.position
 

@@ -6,17 +6,28 @@ cursor.execute("DROP TABLE IF EXISTS players")
 cursor.execute("DROP TABLE IF EXISTS player_id")
 cursor.execute("DROP TABLE IF EXISTS map_engine")
 
+# table_p = """ CREATE TABLE players(
+#             alias text primary key,
+# 			pass text not null,
+# 			x integer,
+# 			y integer,
+# 			level integer,
+# 			ec integer,
+# 			ef integer,
+# 			dead integer,
+#             active boolean not null
+# 		);"""
+
 table_p = """ CREATE TABLE players(
             alias text primary key,
 			pass text not null,
-			x integer,
-			y integer,
 			level integer,
 			ec integer,
 			ef integer,
 			dead integer,
             active boolean not null
 		);"""
+
 
 table_alias = """
             CREATE TABLE player_id(
@@ -35,8 +46,8 @@ CREATE TABLE map_engine(
 cursor.execute(table_p)
 cursor.execute(table_alias)
 cursor.execute(table_map)
-cursor.execute("INSERT INTO players values ('Jesus', '123', 1, 1, 0, 0, 0, 0, 1)")
-cursor.execute("INSERT INTO players values ('Sebas', '123', 2, 1, 0, 0, 0, 0, 1)")
+cursor.execute("INSERT INTO players values ('Jesus', '123', 0, 0, 0, 0, 1)")
+cursor.execute("INSERT INTO players values ('Sebas', '123', 0, 0, 0, 0, 1)")
 cursor.execute("INSERT INTO player_id(alias, active) values('Jesus', 1)")
 cursor.execute("INSERT INTO player_id(alias, active) values('Sebas', 1)")
 cursor.execute("INSERT INTO map_engine(map) values('Holaaa')")

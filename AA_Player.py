@@ -1,5 +1,7 @@
+import blessed
 from getpass import getpass
 from time import sleep
+from time import time
 from kafka import KafkaProducer, KafkaConsumer
 from src.exceptions.socket_exception import SocketException
 from src.Map import Map
@@ -10,6 +12,9 @@ from src.utils.Process_position import position_str
 import threading
 import socket
 import sys
+from waiting import wait
+
+term = blessed.Terminal()
 
 HEADER = 64
 PORT = 5050
@@ -23,6 +28,7 @@ MOVE_ID = 1
 
 DEAD = False
 GAME_STARTED = False
+GAME_END = False
 
 
 # Función para enviar mensajes cliente
@@ -145,17 +151,51 @@ def login(client):
 
     msg_rcv = client.recv(2048).decode(FORMAT)
     msg = msg_rcv.split(",")
-    if msg[1] == "1":
-        print("Logueado correctamente al servidor.")
-        ply_sck = client.recv(2048).decode(FORMAT)
-        PLAYER = process_player(ply_sck)
-        PLAYER.set_dead(False)
-        start_game(KAFKA_SERVER)
+    if msg[0] == "4":
+        if msg[1] == "1":
+            print("Logueado correctamente al servidor.")
+            ply_sck = client.recv(2048).decode(FORMAT)
+            PLAYER = process_player(ply_sck)
+            start_game()
+    elif msg[0] == "-1":
+        print(msg[1])
     else:
-        print("No se ha podido loguear al servidor.")
+        print("Could not connect to the server.")
 
 
-def start_game(server_kafka):
+def wait_user():
+    """
+    Handle user wait.
+    """
+    wait_text = "Please, wait until another clients connect...\nSeconds waiting... {}"
+    consumer = KafkaConsumer("wait", bootstrap_servers=KAFKA_SERVER)
+    timer = time()
+    for msg in consumer:
+        if msg.value.decode(FORMAT) == "False":
+            return True
+        else:
+            clear()
+            print(wait_text.format(abs(int(timer - time()))))
+
+
+def start_game():
+    wait_user()
+
+    # thread_read_map_cli = threading.Thread(target=read_map_cli, args=())
+    # thread_read_map_cli.start()
+
+    # thread_read_player_cli = threading.Thread(target=read_player_cli, args=())
+    # thread_read_player_cli.start()
+
+    thread_send_move_cli = threading.Thread(target=send_move_cli, args=())
+    thread_send_move_cli.start()
+
+    while not GAME_END:
+        sleep(1)
+
+
+@DeprecationWarning
+def start_game_old(server_kafka):
     wait_text = "Please, wait until another clients connect...\n Conected users: {}"
     consumer = (
         KafkaConsumer("start_game", bootstrap_servers=KAFKA_SERVER)
@@ -206,9 +246,6 @@ def read_map_cli():
         clear()
         map_player.print_color()
 
-        if DEAD:
-            break
-
 
 def send_move_cli():
     """
@@ -218,22 +255,17 @@ def send_move_cli():
 
     kafka_producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
 
-    while True:
-        key = input().lower()  # TODO Cambiar a tecla estática
-        kafka_producer.send(
-            "move_player",
-            dict_sockets()["Move"]
-            .format(
-                key=key,
-                move_id=MOVE_ID,
-                position=position_str(PLAYER.get_position()),
-                alias=PLAYER.get_alias(),
+    with term.cbreak():
+        val = ""
+        while val.lower() != "q":
+            # key = input().lower()  # TODO Cambiar a tecla estática
+            key = term.inkey()
+            kafka_producer.send(
+                "keys",
+                "{alias},{key}".format(alias=PLAYER.get_alias(), key=key).encode(
+                    FORMAT
+                ),
             )
-            .encode(FORMAT),
-        )
-
-        if DEAD:
-            break
 
 
 def read_player_cli():
@@ -251,9 +283,6 @@ def read_player_cli():
         msg_split = msg.value.decode(FORMAT).split(",")
         msg_split.pop(0)
         PLAYER = Player(msg_split)
-        print(PLAYER)
-        if DEAD:
-            break
 
 
 def comprobe_dead():
@@ -315,7 +344,7 @@ if len(sys.argv) == 3:
         elif opcion == "3":
             clear()
             login(client)
-            LOGIN_ID = -1
+            # LOGIN_ID = -1
         elif opcion == "4":
             break
 
