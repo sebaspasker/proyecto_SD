@@ -504,6 +504,14 @@ def random_player_distribution():
         MAP.player_random_position(player)
 
 
+def manage_npcs():
+    consumer = KafkaConsumer("npc", bootstrap_servers=KAFKA_SERVER)
+
+    for msg in consumer:
+        pass
+    # TODO
+
+
 def send_kafka(producer, topic, time, number, message):
     """
     Send msg a number of times by a kafka producer with a time sleep.
