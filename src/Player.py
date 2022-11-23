@@ -2,6 +2,7 @@
 from .exceptions.none_value_exception import NoneValueException
 from .exceptions.incorrect_format import IncorrectFormatException
 from .exceptions.out_of_range_exception import OutOfRangeException
+from random import randint
 import sys
 
 sys.path.append("../")
@@ -58,11 +59,36 @@ class Player:
             + "-----------------\n"
         )
 
+    def print_interface(self):
+        alias_ = "".join(self.get_alias()[0:9]) + "".join(
+            "_" for _ in range(len(self.get_alias()), 10)
+        )
+
+        level_ = str(self.get_level()) + "".join(
+            "_" for _ in range(len(str(self.get_level())), 3)
+        )
+
+        cold_ = str(self.get_cold()) + "".join(
+            "_" for _ in range(len(str(self.get_cold())), 3)
+        )
+
+        hot_ = str(self.get_hot()) + "".join(
+            "_" for _ in range(len(str(self.get_hot())), 3)
+        )
+
+        print("¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬")
+        print(
+            "| PLAYER: {} LEVEL: {} COLD: {} HOT: {} |".format(
+                alias_, level_, cold_, hot_
+            )
+        )
+        print("¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬¬")
+
     def reset_game(self):
         self.set_dead(False)
         self.set_level(0)
-        self.set_hot(0)
-        self.set_cold(0)
+        self.set_hot(randint(-10, 10))
+        self.set_cold(randint(-10, 10))
 
     def fight(self, player_2):
         """

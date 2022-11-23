@@ -6,7 +6,8 @@ import sqlite3
 
 # Variables globales constantes
 HEADER = 64
-SERVER = "172.27.178.146"
+# SERVER = "172.27.178.146"
+SERVER = "127.0.0.2"
 FORMAT = "utf-8"
 FIN = "FIN"
 
@@ -24,6 +25,7 @@ def enviarCiudades(ip, puerto):
     ADDR = (ip, int(puerto))
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind(ADDR)
     server.listen()
     print("[STARTING] AA_WEATHER inicializándose...")
@@ -31,6 +33,7 @@ def enviarCiudades(ip, puerto):
 
     while True:
         conn, addr = server.accept()
+        cadena = ""
 
         try:
             # Conexión a la bd

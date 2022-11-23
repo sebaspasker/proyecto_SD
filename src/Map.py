@@ -1,6 +1,7 @@
 from .exceptions.out_of_range_exception import OutOfRangeException
 from .exceptions.not_player_exception import NotPlayerException
 from .utils.Colors import *
+from .utils.Search_player_dict import search_players_dict
 from random import choices, randint
 from .Player import *
 
@@ -35,7 +36,7 @@ class Position:
 
 
 # TODO Cambiar a jugadores y NPC ids
-dict_positions = {" ": "None", "M": "Mine", "F": "Food"}
+dict_positions = {" ": "None", "M": "Mine", "A": "Food"}
 dict_positions[range(1, 10)] = "NPC"
 for char in list(string.ascii_lowercase):
     dict_positions[char] = "Player"
@@ -51,12 +52,13 @@ def in_map_range(x, y):
 class Map:
     map_matrix = []
     map_class = []
+    weather = None
 
     def __init__(self, map_string=None):
         if map_string is None:
             self.map_matrix = [
                 [
-                    " " if randint(0, 10) <= 6 else ["M", "F"][randint(0, 1)]
+                    " " if randint(0, 10) <= 8 else ["M", "A"][randint(0, 1)]
                     for i in range(0, 20)
                 ]
                 for j in range(0, 20)
@@ -130,7 +132,7 @@ class Map:
                 prYellow(char)
             elif char == "M":
                 prRed(char)
-            elif char == "F":
+            elif char == "A":
                 prLightPurple(char)
             else:
                 print(char, end="")
@@ -156,7 +158,8 @@ class Map:
         """
         return dict_positions[self.get_map_matrix(position[0], position[1])]
 
-    def evaluate_fight(self, old_position, new_position, player1, player2):
+    @DeprecationWarning
+    def evaluate_fight_old(self, old_position, new_position, player1, player2):
         """
         Evaluate when player-player or player-NPC fight.
         Case player1 wins:
@@ -195,7 +198,8 @@ class Map:
 
         return winner
 
-    def evaluate_mine(self, old_position, new_position, player, mine):
+    @DeprecationWarning
+    def evaluate_mine_old(self, old_position, new_position, player, mine):
         """
         Evaluate if player move to a Mine.
         The player dies.
@@ -206,10 +210,6 @@ class Map:
         self.set_map_matrix(new_position[0], new_position[1], " ")
         return player
 
-    def evaluate_food(self, old_position, new_position, player, food):
-        if player.get_level() < 10:
-            player.set_level(player.get_level() + 1)
-
         # Set map positions
         player.set_position(new_position[0], new_position[1])
         self.set_map_matrix(old_position[0], old_position[1], " ")
@@ -219,12 +219,6 @@ class Map:
         return player
         # self.set_map(old_position[0], old_position[1], 0, None)
         # self.set_map(new_position[0], new_position[1], 1, player)
-
-    def evaluate_space(self, old_position, new_position, player):
-        self.set_map_matrix(old_position[0], old_position[1], " ")
-        self.set_map_matrix(
-            new_position[0], new_position[1], player.get_alias().lower()[0]
-        )
 
     @DeprecationWarning
     def evaluate_move_old(self, old_position, new_position, player):
@@ -257,10 +251,70 @@ class Map:
 
         return player
 
-    def evaluate_move(self, old_position, new_position, player):
-        # new_position_object = self.evaluate_position(new_position)
-        # if position == "None":
-        self.evaluate_space(old_position, new_position, player)
+    def evaluate_mine(self, old_position, new_position, player):
+        self.set_map_matrix(old_position[0], old_position[1], " ")
+        self.set_map_matrix(new_position[0], new_position[1], " ")
+        player.set_dead(True)
+
+    def evaluate_food(self, old_position, new_position, player):
+        player.set_level(player.get_level() + 1)
+        self.set_map_matrix(old_position[0], old_position[1], " ")
+        self.set_map_matrix(
+            new_position[0], new_position[1], player.get_alias().lower()[0]
+        )
+
+    def evaluate_space(self, old_position, new_position, player):
+        self.set_map_matrix(old_position[0], old_position[1], " ")
+        self.set_map_matrix(
+            new_position[0], new_position[1], player.get_alias().lower()[0]
+        )
+
+    def sum_weather(self, position, player):
+        w = None
+        if position[0] <= 9 and position[1] <= 9:
+            w = list(self.weather.values())[0]
+        elif position[0] <= 19 and position[1] <= 9:
+            w = list(self.weather.values())[1]
+        elif postion[0] <= 9 and position[1] <= 19:
+            w = list(self.weather.values())[2]
+        elif position[0] <= 19 and position[1] <= 19:
+            w = list(self.weather.values())[3]
+
+        if w <= 10:
+            return player.get_cold()
+        elif w >= 25:
+            return player.get_hot()
+        else:
+            return 0
+        return w
+
+    def evaluate_fight(self, old_position, new_position, player, players_dict):
+        char_player2 = self.get_map_matrix(new_position[0], new_position[1])
+        player2 = search_players_dict(char_player2, players_dict)
+
+        w_1 = self.sum_weather(old_position, player)
+        w_2 = self.sum_weather(new_position, player2)
+
+        if player.get_level() + w_1 > player2.get_level() + w_2:
+            self.set_map_matrix(old_position[0], old_position[1], " ")
+            self.set_map_matrix(
+                new_position[0], new_position[1], player.get_alias().lower()[0]
+            )
+            player2.set_dead(True)
+        elif player.get_level() + w_1 < player2.get_level() + w_2:
+            self.set_map_matrix(old_position[0], old_position[1], " ")
+            player.set_dead(True)
+
+    def evaluate_move(self, old_position, new_position, player, players_dict):
+        new_position_object = self.evaluate_position(new_position)
+        if new_position_object == "None":
+            self.evaluate_space(old_position, new_position, player)
+        elif new_position_object == "Player":
+            self.evaluate_fight(old_position, new_position, player, players_dict)
+        elif new_position_object == "Food":
+            self.evaluate_food(old_position, new_position, player)
+        elif new_position_object == "Mine":
+            self.evaluate_mine(old_position, new_position, player)
 
         # if get_city(old_position) != get_city(new_position):
         # TODO
@@ -290,18 +344,30 @@ class Map:
         self.set_map_matrix(x, y, num)
         self.set_map_class(x, y, obj)
 
+    def set_weather(self, weather_dict):
+        # self.weather = weather_dict
+        self.weather = {
+            "A": 26,
+            "B": 26,
+            "C": 26,
+            "D": 26,
+        }
+
     # GETTERS
     def get_map_matrix(self, x, y):
         if in_map_range(x, y):
             return self.map_matrix[x][y]
         else:
-            raise OutOfRangeException("Range should be between 0 and 19")
+            return None
 
     def get_map_class(self, x, y):
         if in_map_range(x, y):
             return self.map_class[x][y]
         else:
-            raise OutOfRangeException("Range should be between 0 and 19")
+            return None
+
+    def get_weather(self):
+        return self.weather
 
 
 # map_class = Map()

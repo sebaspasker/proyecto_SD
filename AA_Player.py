@@ -6,6 +6,7 @@ from kafka import KafkaProducer, KafkaConsumer
 from src.exceptions.socket_exception import SocketException
 from src.Map import Map
 from src.Player import Player
+from src.Map import Map
 from src.utils.Sockets_dict import dict_sockets
 from src.utils.Clear import clear
 from src.utils.Process_position import position_str
@@ -24,12 +25,13 @@ FIN = "FIN"
 LOGIN_ID = -1
 
 PLAYER = Player()
-MOVE_ID = 1
+MAP = None
 
 DEAD = False
 GAME_STARTED = False
 GAME_END = False
 
+CHANGE = False
 
 # Función para enviar mensajes cliente
 def send(msg, client):
@@ -184,11 +186,14 @@ def start_game():
     thread_read_map_cli = threading.Thread(target=read_map_cli, args=())
     thread_read_map_cli.start()
 
-    # thread_read_player_cli = threading.Thread(target=read_player_cli, args=())
-    # thread_read_player_cli.start()
+    thread_read_player_cli = threading.Thread(target=read_player_cli, args=())
+    thread_read_player_cli.start()
 
     thread_send_move_cli = threading.Thread(target=send_move_cli, args=())
     thread_send_move_cli.start()
+
+    thread_print_game = threading.Thread(target=print_game, args=())
+    thread_print_game.start()
 
     while not GAME_END:
         sleep(1)
@@ -234,17 +239,34 @@ def dead():
         print("--------------------------------------------------------")
 
 
+def print_game():
+    """
+    Function to print the game client.
+    """
+    global MAP, PLAYER, CHANGE
+
+    while True:
+        if CHANGE:
+            clear()
+            if MAP is not None:
+                MAP.print_color()
+            if PLAYER is not None:
+                PLAYER.print_interface()
+            CHANGE = not CHANGE
+
+
 def read_map_cli():
     """
     Function to read and print a map
     """
 
+    global MAP, CHANGE
+
     kafka_consumer = KafkaConsumer("map_engine", bootstrap_servers=KAFKA_SERVER)
 
     for message in kafka_consumer:
-        map_player = Map(message.value.decode(FORMAT)[-400:])
-        clear()
-        map_player.print_color()
+        MAP = Map(message.value.decode(FORMAT)[-400:])
+        CHANGE = True
 
 
 def send_move_cli():
@@ -273,7 +295,7 @@ def read_player_cli():
     """
     Function to recieve player information
     """
-    global PLAYER, MOVE_ID
+    global PLAYER, CHANGE
 
     kafka_consumer = KafkaConsumer(
         "player_{}".format(PLAYER.get_alias().lower()[0]),
@@ -284,6 +306,7 @@ def read_player_cli():
         msg_split = msg.value.decode(FORMAT).split(",")
         msg_split.pop(0)
         PLAYER = Player(msg_split)
+        CHANGE = True
 
 
 def comprobe_dead():

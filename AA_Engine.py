@@ -16,15 +16,18 @@ KAFKA_SERVER = "127.0.0.2:9092"
 # KAFKA_SERVER = "172.27.203.240:9092"
 DB_SERVER = "againstall.db"
 
+IP_WEATHER = "127.0.0.2"
 IP_SOCKET = "127.0.0.2"
 # IP_SOCKET = "172.27.203.240"
 PUERTO_SOCKET = 5050
+PUERTO_WEATHER = 8080
 HEADER = 64
 FORMAT = "utf-8"
 
 MAX_USERS = 4
 CONNECTED = 0
 MAP = Map()
+WEATHER_DICT = {}
 
 GAME_STARTED = False
 WAIT_STARTED = False
@@ -90,8 +93,6 @@ def create_map():
 
     global map_engine
     map_engine = Map()
-    # TODO cambiar
-    map_engine.empty_map()
 
     connection = sqlite3.connect(DB_SERVER)
     cursor = connection.cursor()
@@ -519,6 +520,20 @@ def wait_client():
             break
 
 
+def execute_threads_start_game():
+    global MAP
+    # Set weather
+    MAP.set_weather(WEATHER_DICT)
+    # Start sending map
+    threading.Thread(target=send_map, args=()).start()
+    # Start recieving keys
+    threading.Thread(target=recieve_key_clients, args=()).start()
+    # Send players kafka
+    threading.Thread(target=send_dict_players, args=()).start()
+    # Random players distribution
+    random_player_distribution()
+
+
 def wait_server():
     global WAIT_USER
     print("[WAIT SERVER] Wait server started. Seconds: {}...".format(TIME_WAIT_SEC))
@@ -530,13 +545,10 @@ def wait_server():
         if i == 50:
             send_map()
     WAIT_USER = False
-    # Start sending Kafa stop wait
+    # Start sending Kafka stop wait
     threading.Thread(target=send_kafka, args=(producer, "wait", 1, 10, "False")).start()
-    # Start sending map
-    threading.Thread(target=send_map, args=()).start()
-    # Start recieving keys
-    threading.Thread(target=recieve_key_clients, args=()).start()
-    random_player_distribution()
+
+    execute_threads_start_game()
 
 
 def process_new_position(position, key):
@@ -558,10 +570,10 @@ def process_key_client(alias, key):
     player = players_dict[alias]
     position = MAP.search_player(alias)
     new_position = process_new_position(position, key)
-    MAP.evaluate_move(position, new_position, player)
+    player.set_hot(-1)
+    players_dict["Jesus"].set_hot(0)
+    MAP.evaluate_move(position, new_position, player, players_dict)
     CHANGE = True
-    # TODO Crear función empty map, función random player position in map,
-    # función distribute players_dict in map random y ver como se mueve vacío
 
 
 def recieve_key_clients():
@@ -575,12 +587,23 @@ def recieve_key_clients():
 
 
 def send_dict_players():
+    producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
     while True:
         sleep(1)
-        for key in dict_players.keys:
-            pass
-            # producer.send(bootstrap_servers=KAFKA_SERVER)
-            # TODO
+        for key in players_dict.keys():
+            player = players_dict[key]
+            producer.send(
+                "player_{}".format(key[0].lower()),
+                dict_sockets()["Player"]
+                .format(
+                    alias=player.get_alias(),
+                    level=str(player.get_level()),
+                    hot=str(player.get_hot()),
+                    cold=str(player.get_cold()),
+                    dead=str(player.get_dead()),
+                )
+                .encode(FORMAT),
+            )
 
 
 def handle_client(connection, address):
@@ -588,8 +611,6 @@ def handle_client(connection, address):
     alias = login_client(connection, address)
 
     wait_client()
-
-    print("START GAME")
 
 
 @DeprecationWarning
@@ -650,6 +671,28 @@ def handle_client_old(connection, address):
                     connection.send(dict_sockets()["Incorrect"].encode(FORMAT))
 
 
+def weather_socket():
+    global WEATHER_DICT
+    ADDR = (IP_WEATHER, PUERTO_WEATHER)
+    msg = None
+    try:
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client.connect(ADDR)
+
+        msg = client.recv(2048).decode(FORMAT).split(",")
+        print("[CONNECTED WEATHER] Conectado al servidor weather.")
+    except ConnectionRefusedError:
+        print("[ERROR] Servidor WEATHER no está corriendo...")
+
+    if msg is not None:
+        WEATHER_DICT = {
+            msg[0]: int(msg[1]),
+            msg[2]: int(msg[3]),
+            msg[4]: int(msg[5]),
+            msg[6]: int(msg[7]),
+        }
+
+
 def server_socket():
     ADDR_SOCKET = (IP_SOCKET, PUERTO_SOCKET)
 
@@ -674,14 +717,13 @@ def server_socket():
 if len(sys.argv) == 1:
     #     IP = "127.0.0.6"  # puerto de escucha
     #     MAXJUGADORES = 3
-    #     PUERTO_WEATHER = 8080
-    #     ADDR = (IP, PUERTO_WEATHER)
 
     print("[STARTING] Inicializando AA_Engine Socket Server")
 
     threading.Thread(target=create_map, args=()).start()  # Creamos mapa
     threading.Thread(target=wait_server, args=()).start()
 
+    weather_socket()
     server_socket = server_socket()
     server_socket.listen()
     while True:
@@ -693,18 +735,7 @@ if len(sys.argv) == 1:
     server.close()
 
 
-#     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#     client.connect(
-#         ADDR
-#     )  # nada mas conectarse con el servidor de clima este hace la select de las 4 ciudades
-#     print(f"Establecida conexión en [{ADDR}]")
-
-#     client.close()
 # else:
 #     print(
 #         "Oops!. Parece que algo falló. Necesito estos argumentos: <Puerto de escucha> <Número máximo de jugadores> <Puerto AA_Weather>"
 #     )
-
-# start_game()
-# read_map()
-# send_map(KAFKA_SERVER)
