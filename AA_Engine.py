@@ -516,6 +516,7 @@ def random_player_distribution():
     """
 
     global MAP
+    print(players_dict.keys())
     for player in players_dict.values():
         MAP.player_random_position(player)
 
@@ -624,7 +625,7 @@ def process_key_npc(alias, key):
     npc = npc_dict[alias]
     position = npc.get_position()
     new_position = process_new_position(position, key)
-    # MAP.evaluate_move_npc(position, new_position, npc, npc_dict, players_dict)
+    MAP.evaluate_move(position, new_position, npc, players_dict, npc_dict, True)
     CHANGE = True
 
 
@@ -641,7 +642,7 @@ def process_key_client(alias, key):
     player = players_dict[alias]
     position = MAP.search_player(alias)
     new_position = process_new_position(position, key)
-    MAP.evaluate_move(position, new_position, player, players_dict)
+    MAP.evaluate_move(position, new_position, player, players_dict, npc_dict)
     CHANGE = True
 
 

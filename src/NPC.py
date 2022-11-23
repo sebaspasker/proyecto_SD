@@ -36,6 +36,9 @@ class NPC:
         else:
             raise OutOfRangeException("El nivel del NPC tiene que estar entre 0 y 9")
 
+    def set_dead(self, dead):
+        self.dead = dead
+
     def set_alias(self, alias):
         self.alias = alias
 
