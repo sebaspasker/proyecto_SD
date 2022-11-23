@@ -1,3 +1,4 @@
+from blessed import Terminal
 from .exceptions.out_of_range_exception import OutOfRangeException
 from .exceptions.not_player_exception import NotPlayerException
 from .utils.Colors import *
@@ -14,6 +15,8 @@ import string
 #     "player" : Player(),
 #     "NPC" : NPC(),
 # }
+
+term = Terminal()
 
 
 @DeprecationWarning
@@ -275,7 +278,7 @@ class Map:
             w = list(self.weather.values())[0]
         elif position[0] <= 19 and position[1] <= 9:
             w = list(self.weather.values())[1]
-        elif postion[0] <= 9 and position[1] <= 19:
+        elif position[0] <= 9 and position[1] <= 19:
             w = list(self.weather.values())[2]
         elif position[0] <= 19 and position[1] <= 19:
             w = list(self.weather.values())[3]
@@ -345,13 +348,7 @@ class Map:
         self.set_map_class(x, y, obj)
 
     def set_weather(self, weather_dict):
-        # self.weather = weather_dict
-        self.weather = {
-            "A": 26,
-            "B": 26,
-            "C": 26,
-            "D": 26,
-        }
+        self.weather = weather_dict
 
     # GETTERS
     def get_map_matrix(self, x, y):

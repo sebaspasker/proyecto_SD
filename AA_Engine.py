@@ -570,8 +570,6 @@ def process_key_client(alias, key):
     player = players_dict[alias]
     position = MAP.search_player(alias)
     new_position = process_new_position(position, key)
-    player.set_hot(-1)
-    players_dict["Jesus"].set_hot(0)
     MAP.evaluate_move(position, new_position, player, players_dict)
     CHANGE = True
 

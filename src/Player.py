@@ -159,7 +159,7 @@ class Player:
 
     def set_cold(self, cold_input):
         if cold_input >= -10 and cold_input <= 10:
-            self.colf = cold_input
+            self.cold = cold_input
         else:
             raise OutOfRangeException("Cold should be between -10 and 10")
 
