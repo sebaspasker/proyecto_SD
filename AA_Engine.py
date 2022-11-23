@@ -6,6 +6,7 @@ import random
 from time import sleep
 from src.Map import Map
 from src.Player import Player
+from src.NPC import NPC
 from src.utils.Sockets_dict import dict_sockets
 from src.utils.Sockets_dict import dict_send_error
 from src.utils.Process_position import process_position
@@ -39,7 +40,7 @@ CHANGE = False
 RESET_VALUES = False
 WAIT_USER = True
 
-TIME_WAIT_SEC = 20
+TIME_WAIT_SEC = 10
 
 last_id_msg = {}  # Last id for message client
 
@@ -47,6 +48,7 @@ sys.path.append("src")
 sys.path.append("src/exceptions")
 
 players_dict = {}
+npc_dict = {}
 dead_list = []
 
 ###### UTILS ###########
@@ -498,24 +500,50 @@ def login_client(connection, address):
                     connection.send(dict_sockets()["Incorrect"].encode(FORMAT))
 
 
+def random_npc_distribution():
+    """
+    Distribute active npcs in map.
+    """
+
+    global MAP
+    for npc in npc_dict.values():
+        MAP.npc_random_position(npc)
+
+
 def random_player_distribution():
+    """
+    Distribute random players in map.
+    """
+
     global MAP
     for player in players_dict.values():
         MAP.player_random_position(player)
 
 
 def manage_npcs():
+    """
+    Manage npcs Kafka msgs (keys).
+    """
+
+    global npc_dict
+
+    print("[MANAGING NPC] Started managing npc's moves...")
+
     consumer = KafkaConsumer("npc", bootstrap_servers=KAFKA_SERVER)
 
     for msg in consumer:
-        pass
-    # TODO
+        msg_ = msg.value.decode(FORMAT).split(",")
+        if msg_[2] not in npc_dict:
+            npc = NPC(msg_.copy(), MSG=True)
+            npc_dict[npc.get_alias()] = npc
+        process_key_npc(npc.get_alias(), msg_[4])
 
 
 def send_kafka(producer, topic, time, number, message):
     """
     Send msg a number of times by a kafka producer with a time sleep.
     """
+
     for i in range(0, number):
         producer.send(topic, message.encode(FORMAT))
         sleep(time)
@@ -529,6 +557,10 @@ def wait_client():
 
 
 def execute_threads_start_game():
+    """
+    Thread execution pre-game function.
+    """
+
     global MAP
     # Set weather
     MAP.set_weather(WEATHER_DICT)
@@ -539,10 +571,16 @@ def execute_threads_start_game():
     # Send players kafka
     threading.Thread(target=send_dict_players, args=()).start()
     # Random players distribution
-    random_player_distribution()
+    threading.Thread(target=random_player_distribution, args=()).start()
+    # Manage NPCs
+    threading.Thread(target=manage_npcs, args=()).start()
 
 
 def wait_server():
+    """
+    Function to wait until game starts.
+    """
+
     global WAIT_USER
     print("[WAIT SERVER] Wait server started. Seconds: {}...".format(TIME_WAIT_SEC))
     producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
@@ -560,6 +598,10 @@ def wait_server():
 
 
 def process_new_position(position, key):
+    """
+    Gets a key w,a,s,d and return a new position.
+    """
+
     if key == "w":
         return ((position[0] - 1) if position[0] - 1 >= 0 else 19, position[1])
     elif key == "s":
@@ -570,7 +612,28 @@ def process_new_position(position, key):
         return (position[0], (position[1] + 1) % 20)
 
 
+def process_key_npc(alias, key):
+    """
+    Process a key based on a NPC move.
+    """
+
+    global MAP, CHANGE
+    if alias not in npc_dict.keys():
+        return False
+
+    npc = npc_dict[alias]
+    position = npc.get_position()
+    new_position = process_new_position(position, key)
+    # MAP.evaluate_move_npc(position, new_position, npc, npc_dict, players_dict)
+    CHANGE = True
+
+
 def process_key_client(alias, key):
+    """
+    Process a key based on a client player move.
+    """
+
+    # TODO procesar ncps enemigos
     global MAP, CHANGE
     if alias not in players_dict.keys():
         return False
@@ -583,6 +646,10 @@ def process_key_client(alias, key):
 
 
 def recieve_key_clients():
+    """
+    Recieves keys from clients.
+    """
+
     print("[RECIEVING KEYS] Recieving keys from clients.")
     consumer = KafkaConsumer("keys", bootstrap_servers=KAFKA_SERVER)
     for msg in consumer:
@@ -593,6 +660,10 @@ def recieve_key_clients():
 
 
 def send_dict_players():
+    """
+    Send players to kafka producer by client.
+    """
+
     producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
     while True:
         sleep(1)
@@ -613,6 +684,10 @@ def send_dict_players():
 
 
 def handle_client(connection, address):
+    """
+    Handle login and set client on wait mode.
+    """
+
     print("[NEW CONEXION] {} connected.".format(connection))
     alias = login_client(connection, address)
 
@@ -678,6 +753,10 @@ def handle_client_old(connection, address):
 
 
 def weather_socket():
+    """
+    Process AA_Weather saving 4 cities and they temperatures.
+    """
+
     global WEATHER_DICT
     ADDR = (IP_WEATHER, PUERTO_WEATHER)
     msg = None
@@ -700,6 +779,10 @@ def weather_socket():
 
 
 def server_socket():
+    """
+    Create a socket listeners for client connections.
+    """
+
     ADDR_SOCKET = (IP_SOCKET, PUERTO_SOCKET)
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -713,11 +796,6 @@ def server_socket():
 
     return server_socket
 
-
-# TODO Seguramente en el handle client -> Solo uno acepta los movimientos
-# TODO Al moverse no se mueve bien el usuario
-# TODO Maps hay veces que no borra el movimiento anterior
-# TODO Arreglar engine
 
 ########## MAIN ##########
 if len(sys.argv) == 1:

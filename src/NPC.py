@@ -8,11 +8,17 @@ class NPC:
     level = 0
     dead = False
 
-    def __init__(self, list_str=None):
-        if list_str is not None:
+    def __init__(self, list_str=None, MSG=False):
+        if list_str is not None and not MSG:
             self.position = (int(list_str[0]), int(list_str[1]))
             self.alias = list_str[0]
             self.level = int(list_str[1])
+        elif list_str is not None and MSG:
+            pos_str = list_str[1][1:-1]
+            x, y = map(int, pos_str.split("."))
+            self.position = (x, y)
+            self.alias = list_str[2]
+            self.level = int(list_str[3])
 
     def __str__(self):
         return "NPC: {}, level: {}".format(self.alias, self.level)
@@ -35,7 +41,7 @@ class NPC:
 
     def set_position(self, x, y):
         if x >= 0 and x <= 19 and y >= 0 and y <= 19:
-            self.position(x, y)
+            self.position = (x, y)
         else:
             raise OutOfRangeException(
                 "La posición del NPC tiene que estar entre 0 y 19. (̣{},{})".format(
@@ -50,3 +56,6 @@ class NPC:
 
     def get_level(self):
         return self.level
+
+    def get_position(self):
+        return self.position

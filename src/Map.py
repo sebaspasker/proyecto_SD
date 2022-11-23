@@ -94,8 +94,26 @@ class Map:
     def empty_map(self):
         self.map_matrix = [[" " for x in range(0, 20)] for i in range(0, 20)]
 
+    def npc_random_position(self, npc):
+        while True:
+            x, y = randint(0, 19), randint(0, 19)
+            if (
+                self.evaluate_position((x, y)) != "Player"
+                or self.evaluate_position((x, y)) != "NPC"
+            ):
+                self.map_matrix[x][y] = npc.get_level()
+                npc.set_position(x, y)
+                break
+
     def player_random_position(self, player):
-        self.map_matrix[randint(0, 19)][randint(0, 19)] = player.get_alias()[0].lower()
+        while True:
+            x, y = randint(0, 19), randint(0, 19)
+            if (
+                self.evaluate_position((x, y)) != "Player"
+                or self.evaluate_position((x, y)) != "NPC"
+            ):
+                self.map_matrix[x][y] = player.get_alias()[0].lower()
+                break
 
     def raw_string_to_matrix(self, map_string):
         """
