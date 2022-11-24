@@ -3,6 +3,7 @@ from .exceptions.out_of_range_exception import OutOfRangeException
 from .exceptions.not_player_exception import NotPlayerException
 from .utils.Colors import *
 from .utils.Search_player_dict import search_players_dict
+from .utils.Replace_string import replace_string, replace_string_reverse
 from random import choices, randint
 from .Player import *
 
@@ -38,14 +39,11 @@ class Position:
     type_m = ""
 
 
-# TODO Cambiar a jugadores y NPC ids
 dict_positions = {" ": "None", "M": "Mine", "A": "Food"}
 for i in range(0, 10):
-    dict_positions[i] = "NPC"
+    dict_positions[str(i)] = "NPC"
 for char in list(string.ascii_lowercase):
     dict_positions[char] = "Player"
-
-# dict_positions[range(1, 10)] = "NPC"
 
 
 def in_map_range(x, y):
@@ -75,6 +73,10 @@ class Map:
 
     def __str__(self):
         map_str = "    0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16  17  18  19\n"
+
+        cities_line_first, cities_line_last = self.last_and_first_weather_lines()
+        map_str = cities_line_first + map_str
+
         for i in range(0, 20):
             if i <= 9:
                 map_str += "{}  ".format(i)
@@ -85,7 +87,37 @@ class Map:
                 map_str += " {} |".format(self.map_matrix[i][j])
             map_str += "\n"
 
+        map_str += cities_line_last
         return map_str
+
+    def last_and_first_weather_lines(self):
+        cities_line = "                                                                                  \n"
+
+        cities_line_first = replace_string_reverse(
+            replace_string(
+                cities_line,
+                "{} {}º".format(
+                    list(self.weather.keys())[0], list(self.weather.values())[0]
+                ),
+            ),
+            "{} {}º".format(
+                list(self.weather.keys())[1], list(self.weather.values())[1]
+            ),
+        )
+
+        cities_line_last = replace_string_reverse(
+            replace_string(
+                cities_line,
+                "{} {}º".format(
+                    list(self.weather.keys())[2], list(self.weather.values())[2]
+                ),
+            ),
+            "{} {}º".format(
+                list(self.weather.keys())[3], list(self.weather.values())[3]
+            ),
+        )
+
+        return cities_line_first, cities_line_last
 
     def search_player(self, alias):
         char = alias[0].lower()
@@ -180,6 +212,7 @@ class Map:
         """
         Evaluates the matrix position, returning a string of the object
         """
+
         return dict_positions[self.get_map_matrix(position[0], position[1])]
 
     @DeprecationWarning
@@ -215,10 +248,6 @@ class Map:
 
             # Change map and kill player
             self.set_map(old_position[0], old_position[1], 0, None)
-
-            # TODO Gestionamos en la base de datos
-            # TODO Gestionamos en sockets
-            # TODO Gestionamos la muerte del player
 
         return winner
 
@@ -368,11 +397,11 @@ class Map:
         player2 = search_players_dict(char_player2, players_dict)
         w_2 = self.sum_weather(new_position, player2)
 
-        if npc.get_level() + w_1 > player2.get_level() + w_2:
+        if npc.get_level() > player2.get_level() + w_2:
             self.set_map_matrix(old_position[0], old_position[1], " ")
             self.set_map_matrix(new_position[0], new_position[1], str(npc.get_level()))
             player2.set_dead(True)
-        elif npc.get_level() + w_1 < player2.get_level() + w_2:
+        elif npc.get_level() < player2.get_level() + w_2:
             self.set_map_matrix(old_position[0], old_position[1], " ")
             npc.set_dead(True)
 
@@ -429,11 +458,18 @@ class Map:
         ):
             self.evaluate_space_npc(old_position, new_position, npc)
         elif new_position_object == "Player":
-            evaluate_fight_npc(old_position, new_position, npc, players_dict)
+            self.evaluate_fight_npc(old_position, new_position, npc, players_dict)
 
     # SETTERS
     def set_map_matrix(self, x, y, char):
         self.map_matrix[x][y] = char
+
+    def set_player_in_map(self, x, y, player):
+        self.set_map_matrix(x, y, player.get_alias()[0].lower())
+
+    def set_npc_in_map(self, x, y, npc):
+        npc.set_position(x, y)
+        self.set_map_matrix(x, y, str(npc.get_level()))
 
     @DeprecationWarning
     def set_map_class(self, x, y, obj):
@@ -458,8 +494,6 @@ class Map:
     def get_map_matrix(self, x, y):
         if in_map_range(x, y):
             return self.map_matrix[x][y]
-        else:
-            return None
 
     def get_map_class(self, x, y):
         if in_map_range(x, y):
@@ -469,6 +503,10 @@ class Map:
 
     def get_weather(self):
         return self.weather
+
+    # TESTING
+    def set_none_influencial_weather(self):
+        self.weather = {"None1": 15, "None2": 15, "None3": 15, "None4": 15}
 
 
 # map_class = Map()

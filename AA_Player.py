@@ -26,6 +26,7 @@ LOGIN_ID = -1
 
 PLAYER = Player()
 MAP = None
+WEATHER = None
 
 DEAD = False
 GAME_STARTED = False
@@ -183,6 +184,9 @@ def wait_user():
 def start_game():
     wait_user()
 
+    thread_read_weather_cli = threading.Thread(target=read_weather_cli, args=())
+    thread_read_weather_cli.start()
+
     thread_read_map_cli = threading.Thread(target=read_map_cli, args=())
     thread_read_map_cli.start()
 
@@ -255,6 +259,21 @@ def print_game():
             CHANGE = not CHANGE
 
 
+def read_weather_cli():
+    """
+    Function to read the weather and save it in MAP
+    """
+    global WEATHER
+
+    consumer = KafkaConsumer("weather", bootstrap_servers=KAFKA_SERVER)
+    for msg in consumer:
+        msg_ = msg.value.decode(FORMAT).split(",")
+        weather = {}
+        for i in range(1, 9, 2):
+            weather[msg_[i]] = msg_[i + 1]
+        WEATHER = weather
+
+
 def read_map_cli():
     """
     Function to read and print a map
@@ -266,6 +285,10 @@ def read_map_cli():
 
     for message in kafka_consumer:
         MAP = Map(message.value.decode(FORMAT)[-400:])
+        if WEATHER is None:
+            MAP.set_none_influencial_weather()
+        else:
+            MAP.set_weather(WEATHER)
         CHANGE = True
 
 

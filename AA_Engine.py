@@ -306,13 +306,45 @@ def send_map(server=None):
         wait_until_change()
         try:
             producer.send("map_engine", MAP.to_raw_string().encode(FORMAT))
-            MAP.print_color()
             CHANGE = False
         except ValueError as VE:
             print("VALUE ERROR: Cerrando engine...")
             print("{}".format(VE.message))
         except KeyboardInterrupt:
             print("Keyboard Interruption: Cerrando engine...")
+
+
+def send_weather(server=None):
+    """
+    Send the weather to kafka
+    """
+    producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+
+    print("[SENDING WEATHER] Sending weather to topic 'weather'")
+    while True:
+        try:
+            weather = MAP.get_weather()
+            keys = list(weather.keys())
+            producer.send(
+                "weather",
+                dict_sockets()["Weather"]
+                .format(
+                    city_1=keys[0],
+                    t_1=weather[keys[0]],
+                    city_2=keys[1],
+                    t_2=weather[keys[1]],
+                    city_3=keys[2],
+                    t_3=weather[keys[2]],
+                    city_4=keys[3],
+                    t_4=weather[keys[3]],
+                )
+                .encode(FORMAT),
+            )
+            sleep(1)
+        except:
+            print(
+                "[WEATHER SEND ERROR] Ha habido un error a la hora de enviar el weather..."
+            )
 
 
 def see_new_position(position, key):
@@ -542,6 +574,7 @@ def manage_npcs():
         if msg_[2] not in npc_dict:
             # Only save position first time
             # for engine manage the actual npc position
+            npc.level = 0
             npc_dict[npc.get_alias()] = npc
         process_key_npc(npc.get_alias(), msg_[4])
 
@@ -571,6 +604,8 @@ def execute_threads_start_game():
     global MAP
     # Set weather
     MAP.set_weather(WEATHER_DICT)
+    # Start sending weather
+    threading.Thread(target=send_weather, args=()).start()
     # Start sending map
     threading.Thread(target=send_map, args=()).start()
     # Start recieving keys

@@ -1,10 +1,9 @@
 scripts de path kafka y zookeeper y ejecucion para ejecutar en clase
 Manejo de variables desde lista de comandos
 Manejo de conectados con kafka conectado? respuesta
-HACER ENGINE WEATHER -> Done
-NPC
-Manejo de muerte
+Manejo de muerte en NPC, Player y Engine.
 Manejo de desconexión
 Printar players en mapa con color background
 Añadir Ciudades y temperaturas en el mapa con linea de color
 Partida no iniciada e intenta moverse -> printea error al jugador
+
