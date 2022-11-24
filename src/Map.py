@@ -101,7 +101,7 @@ class Map:
                 self.evaluate_position((x, y)) != "Player"
                 or self.evaluate_position((x, y)) != "NPC"
             ):
-                self.map_matrix[x][y] = npc.get_level()
+                self.map_matrix[x][y] = str(npc.get_level())
                 npc.set_position(x, y)
                 break
 
@@ -284,6 +284,11 @@ class Map:
             new_position[0], new_position[1], player.get_alias().lower()[0]
         )
 
+    def evaluate_space_npc(self, old_position, new_position, npc):
+        self.set_map_matrix(old_position[0], old_position[1], " ")
+        self.set_map_matrix(new_position[0], new_position[1], str(npc.get_level()))
+        npc.set_position(new_position[0], new_position[1])
+
     def evaluate_space(self, old_position, new_position, player):
         self.set_map_matrix(old_position[0], old_position[1], " ")
         self.set_map_matrix(
@@ -326,7 +331,26 @@ class Map:
             self.set_map_matrix(old_position[0], old_position[1], " ")
             player.set_dead(True)
 
-    def evaluate_move(self, old_position, new_position, player, players_dict):
+    def evaluate_npc(self, old_position, new_position, player, npc_dict):
+        npc_fight = None
+        for npc in npc_dict.values():
+            if npc.get_position() == new_position:
+                npc_fight = npc
+                break
+        if npc_fight is not None:
+            w_1 = self.sum_weather(old_position, player)
+            if player.get_level() + w_1 > npc_fight.get_level():
+                self.set_map_matrix(old_position[0], old_position[1], " ")
+                self.set_map_matrix(
+                    new_position[0], new_position[1], player.get_alias().lower()[0]
+                )
+                npc.set_dead(True)
+
+            elif player.get_level() + w_1 < npc_fight.get_level():
+                self.set_map_matrix(old_position[0], old_position[1], " ")
+                player.set_dead(True)
+
+    def evaluate_move(self, old_position, new_position, player, players_dict, npc_dict):
         new_position_object = self.evaluate_position(new_position)
         if new_position_object == "None":
             self.evaluate_space(old_position, new_position, player)
@@ -336,14 +360,22 @@ class Map:
             self.evaluate_food(old_position, new_position, player)
         elif new_position_object == "Mine":
             self.evaluate_mine(old_position, new_position, player)
+        elif new_position_object == "NPC":
+            self.evaluate_npc(old_position, new_position, player, npc_dict)
 
-        # if get_city(old_position) != get_city(new_position):
-        # TODO
-        # Mirar la temperatura del servidor de temperatura y evaluar en base a
-        # ello el jugador
-        # pass
-
-        # print(self.get_map_matrix)
+    def evaluate_move_npc(
+        self, old_position, new_position, npc, players_dict, npc_dict
+    ):
+        new_position_object = self.evaluate_position(new_position)
+        if (
+            new_position_object == "None"
+            or new_position_object == "Food"
+            or new_position_object == "Mine"
+        ):
+            self.evaluate_space_npc(old_position, new_position, npc)
+        elif new_position_object == "Player":
+            # TODO hacer para pelear contra jugador
+            pass
 
     # SETTERS
     def set_map_matrix(self, x, y, char):
