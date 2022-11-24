@@ -21,7 +21,25 @@ class NPC:
             self.level = int(list_str[3])
 
     def __str__(self):
-        return "NPC: {}, level: {}".format(self.alias, self.level)
+        return "NPC: {}, level: {}, position: {}, dead: {}".format(
+            self.alias, self.level, self.position, self.dead
+        )
+
+    def __eq__(self, other):
+        return (
+            self.position == other.get_position()
+            and self.alias == other.get_alias()
+            and self.level == other.get_level()
+            and self.dead == other.get_dead()
+        )
+
+    def __ne__(self, other):
+        return (
+            self.position != other.get_position()
+            or self.alias != other.get_alias()
+            or self.level != other.get_level()
+            or self.dead != other.get_dead()
+        )
 
     def create_random(self, id_):
         self.set_alias("NPC_{}".format(id_))
@@ -62,3 +80,6 @@ class NPC:
 
     def get_position(self):
         return self.position
+
+    def get_dead(self):
+        return self.dead

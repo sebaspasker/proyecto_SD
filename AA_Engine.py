@@ -30,9 +30,9 @@ CONNECTED = 0
 MAP = Map()
 WEATHER_DICT = {}
 
-GAME_STARTED = False
-WAIT_STARTED = False
-SENDING_MAP = False
+# GAME_STARTED = False
+# WAIT_STARTED = False
+# SENDING_MAP = False
 MAP_CREATED = False
 MOVE_RECEIVER = False
 RESOLVING_USER = False
@@ -103,10 +103,6 @@ def create_map():
     connection.commit()
     save_map(map_engine)
 
-    # Actualiza y mete los jugadores activos en el mapa
-    # actualize_players_position()
-
-    # map_p = read_map()
     global MAP
     MAP = read_map()
 
@@ -120,6 +116,7 @@ def save_player_position(connection, cursor, alias, x, y):
     )
 
 
+@DeprecationWarning
 def actualize_players_position():
     connection = sqlite3.connect(DB_SERVER)
     cursor = connection.cursor()
@@ -150,6 +147,7 @@ def save_map(map_to_saved):
     connection.close()
 
 
+@DeprecationWarning
 def start_game_server(kafka_server=None):
     """
     Waits 60 second until the number of connected are max or
@@ -289,10 +287,13 @@ def send_map(server=None):
     Sends a map with kafka to 'map_engine' topic.
     """
 
-    global GAME_STARTED
-    global SENDING_MAP, CHANGE
-    GAME_STARTED = True
-    SENDING_MAP = True
+    # TODO Borrar variables comentadas
+    # global GAME_STARTED
+    # global SENDING_MAP, CHANGE
+    global CHANGE
+
+    # GAME_STARTED = True
+    # SENDING_MAP = True
 
     if server is None:
         producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
@@ -305,6 +306,7 @@ def send_map(server=None):
         wait_until_change()
         try:
             producer.send("map_engine", MAP.to_raw_string().encode(FORMAT))
+            MAP.print_color()
             CHANGE = False
         except ValueError as VE:
             print("VALUE ERROR: Cerrando engine...")
@@ -536,8 +538,10 @@ def manage_npcs():
 
     for msg in consumer:
         msg_ = msg.value.decode(FORMAT).split(",")
+        npc = NPC(msg_.copy(), MSG=True)
         if msg_[2] not in npc_dict:
-            npc = NPC(msg_.copy(), MSG=True)
+            # Only save position first time
+            # for engine manage the actual npc position
             npc_dict[npc.get_alias()] = npc
         process_key_npc(npc.get_alias(), msg_[4])
 
@@ -577,6 +581,8 @@ def execute_threads_start_game():
     threading.Thread(target=random_player_distribution, args=()).start()
     # Manage NPCs
     threading.Thread(target=manage_npcs, args=()).start()
+    # Send npcs kafka
+    threading.Thread(target=send_dict_npc, args=()).start()
 
 
 def wait_server():
@@ -679,7 +685,7 @@ def send_dict_npc():
                     alias=npc.get_alias(),
                     level=str(npc.get_level()),
                     position="[{}.{}]".format(
-                        str(npc.get_position()[0], str(npc.get_position()[1]))
+                        str(npc.get_position()[0]), str(npc.get_position()[1])
                     ),
                     key="x",
                 )
@@ -845,9 +851,3 @@ if len(sys.argv) == 1:
         thread_login.start()
 
     server.close()
-
-
-# else:
-#     print(
-#         "Oops!. Parece que algo falló. Necesito estos argumentos: <Puerto de escucha> <Número máximo de jugadores> <Puerto AA_Weather>"
-#     )

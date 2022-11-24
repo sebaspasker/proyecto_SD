@@ -40,9 +40,12 @@ class Position:
 
 # TODO Cambiar a jugadores y NPC ids
 dict_positions = {" ": "None", "M": "Mine", "A": "Food"}
-dict_positions[range(1, 10)] = "NPC"
+for i in range(0, 10):
+    dict_positions[i] = "NPC"
 for char in list(string.ascii_lowercase):
     dict_positions[char] = "Player"
+
+# dict_positions[range(1, 10)] = "NPC"
 
 
 def in_map_range(x, y):
@@ -374,8 +377,7 @@ class Map:
         ):
             self.evaluate_space_npc(old_position, new_position, npc)
         elif new_position_object == "Player":
-            # TODO hacer para pelear contra jugador
-            pass
+            evaluate_fight_npc(old_position, new_position, npc, players_dict)
 
     # SETTERS
     def set_map_matrix(self, x, y, char):

@@ -6,11 +6,11 @@ from random import randint
 from src.utils.Sockets_dict import dict_sockets
 from src.NPC import NPC
 from time import sleep
-from kafka import KafkaProducer
+from kafka import KafkaProducer, KafkaConsumer
 
 FORMAT = "utf-8"
 KAFKA_SERVER = "127.0.0.2:9092"
-NUMBER_NPC = 5
+NUMBER_NPC = 4
 npc_dict = {}
 npc_bool = {}
 
@@ -27,25 +27,22 @@ def create_npc(id_):
     return npc
 
 
-def recieve_move_npc(alias):
-    pass
-
-
 def recieve_npcs():
+    global npc_bool, npc_dict
     kafka_consumer = KafkaConsumer("npc_recv", bootstrap_servers=KAFKA_SERVER)
     for msg in kafka_consumer:
         msg_ = msg.value.decode(FORMAT).split(",")
-        # TODO Hacer que reciba el mensaje, actualice el npc,
-        # y lo meta en la lista de npc bool si ha habido cambio
+        npc = NPC(msg_, True)
+        npc_bool[npc.get_alias()] = True
+        npc_dict[npc.get_alias()] = npc
+        print(npc)
 
 
 def send_move_npc(alias):
-    global npc_dict
+    global npc_dict, npc_bool
     producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
     while True:
-        while npc_bool[npc.get_alias()]:
-            # Espera a cambio para seguir moviendose
-            sleep(1)
+        sleep(1)
         npc = npc_dict[alias]
         move = moves[randint(0, 3)]
         producer.send(
@@ -53,14 +50,16 @@ def send_move_npc(alias):
             dict_sockets()["NPC"]
             .format(
                 alias=npc.get_alias(),
-                level=npc.get_level(),
-                position="({}.{})".format(
+                level=npc.get_level(),  # DEPRECATED (NOT USING)
+                position="({}.{})".format(  # DEPRECATED (NOT USING)
                     str(npc.get_position()[0]), str(npc.get_position()[1])
                 ),
                 key=move,
             )
             .encode(FORMAT),
         )
+
+        npc_bool[alias] = False
 
 
 ####### MAIN #######
@@ -75,3 +74,7 @@ for x in range(1, NUMBER_NPC + 1):
             npc.get_alias(), npc.get_level()
         )
     )
+
+# Recieve npcs from Engine
+thread_recieve_npcs = threading.Thread(target=recieve_npcs, args=())
+thread_recieve_npcs.start()
