@@ -505,6 +505,8 @@ def random_npc_distribution():
     Distribute active npcs in map.
     """
 
+    # TODO Hacer que lo distribuya, actualice la posición en AA_NPC
+    # y a partir de ahí se mueva
     global MAP
     for npc in npc_dict.values():
         MAP.npc_random_position(npc)
@@ -625,7 +627,7 @@ def process_key_npc(alias, key):
     npc = npc_dict[alias]
     position = npc.get_position()
     new_position = process_new_position(position, key)
-    MAP.evaluate_move(position, new_position, npc, players_dict, npc_dict, True)
+    MAP.evaluate_move_npc(position, new_position, npc, players_dict, npc_dict)
     CHANGE = True
 
 
@@ -658,6 +660,31 @@ def recieve_key_clients():
         alias = msg_[0]
         key = msg_[1]
         process_key_client(alias, key)
+
+
+def send_dict_npc():
+    """
+    Send npcs to kafka producer by client.
+    """
+
+    producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+    while True:
+        sleep(1)
+        for key in npc_dict.keys():
+            npc = npc_dict[key]
+            producer.send(
+                "npc_recv",
+                dict_sockets()["NPC"]
+                .format(
+                    alias=npc.get_alias(),
+                    level=str(npc.get_level()),
+                    position="[{}.{}]".format(
+                        str(npc.get_position()[0], str(npc.get_position()[1]))
+                    ),
+                    key="x",
+                )
+                .encode(FORMAT),
+            )
 
 
 def send_dict_players():
