@@ -276,11 +276,17 @@ class Map:
         return player
 
     def evaluate_mine(self, old_position, new_position, player):
+        """
+        Evaluate when a player enters to a mine.
+        """
         self.set_map_matrix(old_position[0], old_position[1], " ")
         self.set_map_matrix(new_position[0], new_position[1], " ")
         player.set_dead(True)
 
     def evaluate_food(self, old_position, new_position, player):
+        """
+        Evaluate when a player eats a food.
+        """
         player.set_level(player.get_level() + 1)
         self.set_map_matrix(old_position[0], old_position[1], " ")
         self.set_map_matrix(
@@ -288,17 +294,27 @@ class Map:
         )
 
     def evaluate_space_npc(self, old_position, new_position, npc):
+        """
+        Evaluate when a npc moves to a space, food or mine.
+        """
         self.set_map_matrix(old_position[0], old_position[1], " ")
         self.set_map_matrix(new_position[0], new_position[1], str(npc.get_level()))
         npc.set_position(new_position[0], new_position[1])
 
     def evaluate_space(self, old_position, new_position, player):
+        """
+        Evaluate when a player moves to a space.
+        """
         self.set_map_matrix(old_position[0], old_position[1], " ")
         self.set_map_matrix(
             new_position[0], new_position[1], player.get_alias().lower()[0]
         )
 
     def sum_weather(self, position, player):
+        """
+        Returns players cold when a city is under/eq 10º and returns hot
+        when a city is over/eq 25º.
+        """
         w = None
         if position[0] <= 9 and position[1] <= 9:
             w = list(self.weather.values())[0]
@@ -318,6 +334,12 @@ class Map:
         return w
 
     def evaluate_fight(self, old_position, new_position, player, players_dict):
+        """
+        Evaluate a fight between two players. Have in count weather conditions.
+        In case P1 level > P2 level = P2 dies and P1 moves to P2 position.
+        In case P1 level < P2 level = P1 dies.
+        In case P1 level == P2 level = Nothing happens.
+        """
         char_player2 = self.get_map_matrix(new_position[0], new_position[1])
         player2 = search_players_dict(char_player2, players_dict)
 
@@ -334,7 +356,31 @@ class Map:
             self.set_map_matrix(old_position[0], old_position[1], " ")
             player.set_dead(True)
 
+    def evaluate_fight_npc(self, old_position, new_position, npc, players_dict):
+        """
+        Evaluate a fight between a npc and a player (started by the npc movement).
+        Have in count P2 weather conditions.
+        In case NPC level > P2 level = P2 dies and NPC moves to P2 position.
+        In case NPC level < P2 level = NPC dies.
+        In case NPC level == P2 level = Nothing happens.
+        """
+        char_player2 = self.get_map_matrix(new_position[0], new_position[1])
+        player2 = search_players_dict(char_player2, players_dict)
+        w_2 = self.sum_weather(new_position, player2)
+
+        if npc.get_level() + w_1 > player2.get_level() + w_2:
+            self.set_map_matrix(old_position[0], old_position[1], " ")
+            self.set_map_matrix(new_position[0], new_position[1], str(npc.get_level()))
+            player2.set_dead(True)
+        elif npc.get_level() + w_1 < player2.get_level() + w_2:
+            self.set_map_matrix(old_position[0], old_position[1], " ")
+            npc.set_dead(True)
+
     def evaluate_npc(self, old_position, new_position, player, npc_dict):
+        """
+        Evaluate a fight between one player and a npc (started by the player).
+        help(evaluate_fight_npc) to see conditions.
+        """
         npc_fight = None
         for npc in npc_dict.values():
             if npc.get_position() == new_position:
@@ -354,6 +400,9 @@ class Map:
                 player.set_dead(True)
 
     def evaluate_move(self, old_position, new_position, player, players_dict, npc_dict):
+        """
+        Evaluate a players move.
+        """
         new_position_object = self.evaluate_position(new_position)
         if new_position_object == "None":
             self.evaluate_space(old_position, new_position, player)
@@ -369,6 +418,9 @@ class Map:
     def evaluate_move_npc(
         self, old_position, new_position, npc, players_dict, npc_dict
     ):
+        """
+        Evaluate a npc move.
+        """
         new_position_object = self.evaluate_position(new_position)
         if (
             new_position_object == "None"
