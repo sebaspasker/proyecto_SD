@@ -39,7 +39,10 @@ class Player:
                 self.set_level(int(string_list[1]))
                 self.set_hot(int(string_list[2]))
                 self.set_cold(int(string_list[3]))
-                self.set_dead(string_list[4])
+                if string_list[4] == "False":
+                    self.set_dead(False)
+                elif string_list[4] == "True":
+                    self.set_dead(True)
             else:
                 self.set_alias(string_list[0])
                 self.set_level(int(string_list[3]))

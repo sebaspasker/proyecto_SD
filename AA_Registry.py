@@ -1,17 +1,19 @@
-import socket
-from sqlite3.dbapi2 import Error
+import json
 import threading
+import socket
+import sqlite3
 import sys
 from typing import List
-import sqlite3
+from sqlite3.dbapi2 import Error
 
-
-# Variables globales constantes
-HEADER = 64
-SERVER = "127.0.0.3"
-FORMAT = "utf-8"
-FIN = "FIN"
-
+if len(sys.argv) == 2:
+    with open(sys.argv[1]) as f:
+        JSON_CFG = json.load(f)
+    # Variables globales constantes
+    HEADER = JSON_CFG["HEADER"]
+    SERVER = JSON_CFG["IP_REG"]
+    PORT = JSON_CFG["PORT_REG"]
+    FORMAT = JSON_CFG["FORMAT"]
 
 # Función para crear un nuevo jugador en la bd
 def crearPerfil(lista: List, conn):
@@ -24,11 +26,10 @@ def crearPerfil(lista: List, conn):
 
         # Comando para insertar el jugador en la bd
         command = (
-            "Insert into players values('"
-            + lista[1]
-            + "', '"
-            + lista[2]
-            + "', 1, 0, 0)"
+            "Insert into players values("
+            + "'{}',".format(lista[1])
+            + "'{}',".format(lista[2])
+            + "1, 0, 0, 0, 0)"
         )
         cursor.execute(command)
 
@@ -37,6 +38,8 @@ def crearPerfil(lista: List, conn):
         # Hago commit para guardar los datos en la bd
         connection.commit()
     except Error as e:
+        print("ERROR: No se ha podido añadir usuario")
+        print(e)
         conn.send("Error".encode(FORMAT))
     finally:
         cursor.close()
@@ -59,9 +62,7 @@ def editarPerfil(lista: List, conn):
         cursor.execute(command)
 
         if cursor.rowcount == 0:
-            conn.send(
-                "No se ha encontrado el alias en la base de datos.".encode(FORMAT)
-            )
+            conn.send("ALIAS_NOT_FOUND".encode(FORMAT))
         else:
             conn.send("Perfil editado con éxito.".encode(FORMAT))
 
@@ -69,7 +70,7 @@ def editarPerfil(lista: List, conn):
         connection.commit()
 
     except Error as e:
-        conn.send("Error".encode(FORMAT))
+        conn.send("ERROR".encode(FORMAT))
     finally:
         cursor.close()
         connection.close()
@@ -108,21 +109,24 @@ def handleCliente(conn, addr):
 
 
 ########## MAIN ##########
-if len(sys.argv) == 1:
-    PORT = 5050  # sys.argv[1]
+if len(sys.argv) == 2:
     ADDR = (SERVER, int(PORT))
 
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(ADDR)
+    try:
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind(ADDR)
 
-    print("[STARTING] Inicializando AA_Registry...")
-    server.listen()
-    print(f"[LISTENING] Servidor a la escucha en {SERVER}")
+        print("[STARTING] Inicializando AA_Registry...")
+        server.listen()
+        print(f"[LISTENING] Servidor a la escucha en {SERVER}")
 
-    while True:
-        conn, addr = server.accept()
+        while True:
+            conn, addr = server.accept()
 
-        thread = threading.Thread(target=handleCliente, args=(conn, addr))
-        thread.start()
+            thread = threading.Thread(target=handleCliente, args=(conn, addr))
+            thread.start()
+    except KeyboardInterrupt:
+        print("[POWER OFF] Apagando Servidor AA_Registry...")
 else:
-    print("Error en los parámetros: AA_Registry.py <puerto escucha>")
+    print("Usage: python AA_Registry.py <config.json>")

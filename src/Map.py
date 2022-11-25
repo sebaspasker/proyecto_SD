@@ -193,6 +193,7 @@ class Map:
             else:
                 print(char, end="")
 
+    @DeprecationWarning
     def distribute_ids(self, list_ids):
         """
         Distribute the active players ids around the map.
@@ -275,7 +276,6 @@ class Map:
 
     @DeprecationWarning
     def evaluate_move_old(self, old_position, new_position, player):
-        print(old_position, new_position)
 
         # Evaluate what is in the new position
         new_position_class = self.evaluate_position(new_position)
@@ -423,6 +423,7 @@ class Map:
                     new_position[0], new_position[1], player.get_alias().lower()[0]
                 )
                 npc.set_dead(True)
+                npc_dict[npc.get_alias] = npc
 
             elif player.get_level() + w_1 < npc_fight.get_level():
                 self.set_map_matrix(old_position[0], old_position[1], " ")

@@ -10,7 +10,7 @@ def dict_sockets():
         "Start_Waiting": "5,Waiting,{connected}",
         "Move": "6,{key},{position},{move_id},{alias}",  # Player Move
         "Player": "7,{alias},{level},{hot},{cold},{dead}",  # Player infomation
-        "NPC": "8,{position},{alias},{level},{key}",  # NPC information
+        "NPC": "8,{position},{alias},{level},{key},{dead}",  # NPC information
         "Weather": "9,{city_1},{t_1},{city_2},{t_2},{city_3},{t_3},{city_4},{t_4}",
     }
 

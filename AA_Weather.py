@@ -1,15 +1,18 @@
+import json
 import socket
 from sqlite3.dbapi2 import Error
-import threading
-import sys
 import sqlite3
+import sys
+import threading
 
-# Variables globales constantes
-HEADER = 64
-# SERVER = "172.27.178.146"
-SERVER = "127.0.0.2"
-FORMAT = "utf-8"
-FIN = "FIN"
+if len(sys.argv) == 2:
+    with open(sys.argv[1]) as f:
+        JSON_CFG = json.load(f)
+    # Variables globales constantes
+    SERVER = JSON_CFG["IP_WEATHER"]
+    PORT = JSON_CFG["PORT_WEATHER"]
+    FORMAT = JSON_CFG["FORMAT"]
+    HEADER = JSON_CFG["HEADER"]
 
 
 def send(msg, client):
@@ -32,10 +35,10 @@ def enviarCiudades(ip, puerto):
     print(f"[LISTENING] AA_WEATHER a la escucha en {SERVER}")
 
     while True:
-        conn, addr = server.accept()
-        cadena = ""
-
         try:
+            conn, addr = server.accept()
+            cadena = ""
+
             # Conexión a la bd
             connection = sqlite3.connect("clima.db")
 
@@ -53,7 +56,9 @@ def enviarCiudades(ip, puerto):
             for ciudad in resultado:
                 cadena += str(ciudad[0]) + "," + str(ciudad[1]) + ","
         except Error as e:
-            print("Algo falló")
+            print(e)
+        except KeyboardInterrupt:
+            print("[POWEROFF] Apagando el servidor AA_Weather.")
         finally:
             cursor.close()
             connection.close()
@@ -72,21 +77,14 @@ def enviarCiudades(ip, puerto):
 
 
 ########## MAIN ##########
-if len(sys.argv) == 1:
-    PORT = 8080  # sys.argv[1]
+if len(sys.argv) == 2:
     ADDR = (SERVER, int(PORT))
 
-    # server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # server.bind(ADDR)
+    try:
+        thread = threading.Thread(target=enviarCiudades, args=(SERVER, int(PORT)))
+        thread.start()
+    except KeyboardInterrupt:
+        print("[POWEROFF] Apagando el servidor AA_Weather.")
 
-    # print("[STARTING] Inicializando AA_Weather...")
-    # server.listen()
-    # print(f"[LISTENING] Servidor a la escucha en {SERVER}")
-
-    # conn, addr = server.accept()
-
-    thread = threading.Thread(target=enviarCiudades, args=(SERVER, int(PORT)))
-
-    thread.start()
 else:
-    print("Error en los parámetros: AA_Weather.py <puerto escucha>")
+    print("Usage: python AA_Weather.py <config.json>")

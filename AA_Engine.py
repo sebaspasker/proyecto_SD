@@ -1,9 +1,10 @@
+import json
 import socket
 import sqlite3
 import sys
 import threading
 import random
-from time import sleep
+from time import sleep, time
 from src.Map import Map
 from src.Player import Player
 from src.NPC import NPC
@@ -12,55 +13,34 @@ from src.utils.Sockets_dict import dict_send_error
 from src.utils.Process_position import process_position
 from kafka import KafkaProducer, KafkaConsumer
 
-FORMAT = "utf-8"
-KAFKA_SERVER = "127.0.0.2:9092"
-# KAFKA_SERVER = "172.27.203.240:9092"
-DB_SERVER = "againstall.db"
+if len(sys.argv) == 2:
+    with open(sys.argv[1]) as f:
+        JSON_CFG = json.load(f)
 
-IP_WEATHER = "127.0.0.2"
-IP_SOCKET = "127.0.0.2"
-# IP_SOCKET = "172.27.203.240"
-PUERTO_SOCKET = 5050
-PUERTO_WEATHER = 8080
-HEADER = 64
-FORMAT = "utf-8"
+    IP_SOCKET = JSON_CFG["IP_ENGINE"]
+    PUERTO_SOCKET = JSON_CFG["PORT_ENGINE"]
+    IP_WEATHER = JSON_CFG["IP_WEATHER"]
+    PUERTO_WEATHER = JSON_CFG["PORT_WEATHER"]
+    KAFKA_SERVER = JSON_CFG["KAFKA_SERVER"]
+    DB_SERVER = JSON_CFG["DB_SERVER"]
+    FORMAT = JSON_CFG["FORMAT"]
+    MAX_USERS = JSON_CFG["MAX_USERS"]
+    TIME_WAIT_SEC = JSON_CFG["TIME_WAIT_SEC"]
+    HEADER = JSON_CFG["HEADER"]
 
-MAX_USERS = 4
-CONNECTED = 0
+
 MAP = Map()
 WEATHER_DICT = {}
 
-# GAME_STARTED = False
-# WAIT_STARTED = False
-# SENDING_MAP = False
-MAP_CREATED = False
-MOVE_RECEIVER = False
-RESOLVING_USER = False
 CHANGE = False
-RESET_VALUES = False
 WAIT_USER = True
 
-TIME_WAIT_SEC = 10
-
-last_id_msg = {}  # Last id for message client
 
 sys.path.append("src")
 sys.path.append("src/exceptions")
 
 players_dict = {}
 npc_dict = {}
-dead_list = []
-
-###### UTILS ###########
-# TODO
-
-# UTILS KAFKA
-
-# UTILS SOCKETS
-
-# UTILS DB
-
-########################
 
 
 def connect_db(name=None):
@@ -102,9 +82,9 @@ def create_map():
     cursor.execute("delete from map_engine;")
     connection.commit()
     save_map(map_engine)
-
     global MAP
     MAP = read_map()
+    MAP.set_none_influencial_weather()
 
     connection.commit()
     connection.close()
@@ -223,8 +203,6 @@ def read_map(ddbb_server=None):
     except ValueError as VE:
         print("VALUE ERROR: Cerrando engine...")
         print("{}".format(VE.message))
-    except KeyboardInterrupt:
-        print("Keyboard Interruption: Cerrando engine...")
 
 
 def recieve_map(server):
@@ -248,8 +226,6 @@ def recieve_map(server):
     except ValueError as VE:
         print("VALUE ERROR: Cerrando engine...")
         print("{}".format(VE.message))
-    except KeyboardInterrupt:
-        print("Keyboard Interruption: Cerrando engine...")
 
 
 def read_client(alias, passwd) -> Player:
@@ -277,9 +253,13 @@ def read_client(alias, passwd) -> Player:
 
 def wait_until_change():
     global CHANGE
+    time_1 = time()
     while True:
         if CHANGE:
             return True
+        if time_1 <= time() - 1:
+            return True
+        sleep(0.01)
 
 
 def send_map(server=None):
@@ -287,13 +267,7 @@ def send_map(server=None):
     Sends a map with kafka to 'map_engine' topic.
     """
 
-    # TODO Borrar variables comentadas
-    # global GAME_STARTED
-    # global SENDING_MAP, CHANGE
     global CHANGE
-
-    # GAME_STARTED = True
-    # SENDING_MAP = True
 
     if server is None:
         producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
@@ -310,8 +284,22 @@ def send_map(server=None):
         except ValueError as VE:
             print("VALUE ERROR: Cerrando engine...")
             print("{}".format(VE.message))
-        except KeyboardInterrupt:
-            print("Keyboard Interruption: Cerrando engine...")
+
+
+def send_server_active():
+    """
+    Send a signal to indicate server is alive.
+    """
+    producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+
+    print("[SENDING SERVER SIGNAL] Sending server signal.")
+
+    while True:
+        if WAIT_USER:
+            producer.send("server", "1,{}".format(str(time())).encode(FORMAT))
+        else:
+            producer.send("server", "2,{}".format(str(time())).encode(FORMAT))
+        sleep(1)
 
 
 def send_weather(server=None):
@@ -345,6 +333,8 @@ def send_weather(server=None):
             print(
                 "[WEATHER SEND ERROR] Ha habido un error a la hora de enviar el weather..."
             )
+
+            break
 
 
 def see_new_position(position, key):
@@ -557,6 +547,13 @@ def random_player_distribution():
         MAP.player_random_position(player)
 
 
+def clean_npc(npc):
+    if MAP.get_map_matrix(npc.get_position[0], npc.get_position[1]) == str(
+        npc.get_level()
+    ):
+        MAP.set_map_matrix(npc.get_position[0], npc.get_position[1], " ")
+
+
 def manage_npcs():
     """
     Manage npcs Kafka msgs (keys).
@@ -574,9 +571,11 @@ def manage_npcs():
         if msg_[2] not in npc_dict:
             # Only save position first time
             # for engine manage the actual npc position
-            npc.level = 0
             npc_dict[npc.get_alias()] = npc
-        process_key_npc(npc.get_alias(), msg_[4])
+        if not npc_dict[npc.get_alias()].get_dead():
+            process_key_npc(npc.get_alias(), msg_[4])
+        # else:
+        #     clean_npc(npc)
 
 
 def send_kafka(producer, topic, time, number, message):
@@ -601,9 +600,13 @@ def execute_threads_start_game():
     Thread execution pre-game function.
     """
 
-    global MAP
+    global MAP, GAME_STARTED
+
+    GAME_STARTED = True
+
     # Set weather
-    MAP.set_weather(WEATHER_DICT)
+    if WEATHER_DICT != {}:
+        MAP.set_weather(WEATHER_DICT)
     # Start sending weather
     threading.Thread(target=send_weather, args=()).start()
     # Start sending map
@@ -632,8 +635,7 @@ def wait_server():
     for i in range(0, TIME_WAIT_SEC):
         producer.send("wait", "True".encode(FORMAT))
         sleep(1)
-        if i == 50:
-            send_map()
+
     WAIT_USER = False
     # Start sending Kafka stop wait
     threading.Thread(target=send_kafka, args=(producer, "wait", 1, 10, "False")).start()
@@ -661,15 +663,18 @@ def process_key_npc(alias, key):
     Process a key based on a NPC move.
     """
 
-    global MAP, CHANGE
+    global MAP, CHANGE, npc_dict, players_dict
     if alias not in npc_dict.keys():
         return False
 
     npc = npc_dict[alias]
     position = npc.get_position()
     new_position = process_new_position(position, key)
-    MAP.evaluate_move_npc(position, new_position, npc, players_dict, npc_dict)
-    CHANGE = True
+    if position != (-1, -1):
+        MAP.evaluate_move_npc(position, new_position, npc, players_dict, npc_dict)
+        CHANGE = True
+    else:
+        npc.set_dead(True)
 
 
 def process_key_client(alias, key):
@@ -685,8 +690,9 @@ def process_key_client(alias, key):
     player = players_dict[alias]
     position = MAP.search_player(alias)
     new_position = process_new_position(position, key)
-    MAP.evaluate_move(position, new_position, player, players_dict, npc_dict)
-    CHANGE = True
+    if not player.get_dead():
+        MAP.evaluate_move(position, new_position, player, players_dict, npc_dict)
+        CHANGE = True
 
 
 def recieve_key_clients():
@@ -723,6 +729,7 @@ def send_dict_npc():
                         str(npc.get_position()[0]), str(npc.get_position()[1])
                     ),
                     key="x",
+                    dead=str(npc.get_dead()),
                 )
                 .encode(FORMAT),
             )
@@ -867,22 +874,27 @@ def server_socket():
 
 
 ########## MAIN ##########
-if len(sys.argv) == 1:
+if len(sys.argv) == 2:
     #     IP = "127.0.0.6"  # puerto de escucha
     #     MAXJUGADORES = 3
 
     print("[STARTING] Inicializando AA_Engine Socket Server")
+    try:
+        threading.Thread(target=create_map, args=()).start()  # Creamos mapa
+        threading.Thread(target=wait_server, args=()).start()
+        threading.Thread(target=send_server_active, args=()).start()
 
-    threading.Thread(target=create_map, args=()).start()  # Creamos mapa
-    threading.Thread(target=wait_server, args=()).start()
+        weather_socket()
+        server_socket = server_socket()
+        server_socket.listen()
+        while True:
+            conn, addr = server_socket.accept()
 
-    weather_socket()
-    server_socket = server_socket()
-    server_socket.listen()
-    while True:
-        conn, addr = server_socket.accept()
+            thread_login = threading.Thread(target=handle_client, args=(conn, addr))
+            thread_login.start()
 
-        thread_login = threading.Thread(target=handle_client, args=(conn, addr))
-        thread_login.start()
-
-    server.close()
+        server.close()
+    except KeyboardInterrupt:
+        print("[POWER OFF] Apagando el servidor...")
+else:
+    print("Usage: python3 AA_Engine.py <config.json>")
