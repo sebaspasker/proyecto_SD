@@ -15,6 +15,7 @@ data = {
     "TIME_WAIT_SEC": 10,
     "HEADER": 64,
     "NUMBER_NPC": 4,
+    "RESET": "YES",
 }
 
 with open("./config/config.json", "w") as outfile:

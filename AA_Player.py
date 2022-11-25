@@ -40,11 +40,12 @@ SERVER_ON = True
 CHANGE = False
 EXIT = False
 EXIT_ALL = False
+WINNER = False
 
 
 def reset_values():
     global PLAYER, MAP, WEATHER
-    global GAME_STARTED, GAME_END, EXIT, SERVER_ON, CHANGE
+    global GAME_STARTED, GAME_END, EXIT, SERVER_ON, CHANGE, WINNER
     PLAYER = Player()
     MAP = None
     WEATHER = None
@@ -54,6 +55,7 @@ def reset_values():
     EXIT = False
     SERVER_ON = True
     CHANGE = False
+    WINNER = False
 
 
 # Función para enviar mensajes cliente
@@ -215,6 +217,7 @@ def start_game():
     all_correct = wait_user()
 
     if all_correct:
+
         thread_read_weather_cli = threading.Thread(target=read_weather_cli, args=())
         thread_read_weather_cli.start()
 
@@ -229,6 +232,9 @@ def start_game():
 
         thread_print_game = threading.Thread(target=print_game, args=())
         thread_print_game.start()
+
+        thread_read_winner_cli = threading.Thread(target=read_winner_cli, args=())
+        thread_read_winner_cli.start()
 
         while not EXIT and SERVER_ON:
             sleep(1)
@@ -260,6 +266,37 @@ def start_game_old(server_kafka):
             thread_read_player_cli.start()
             sleep(3)
             play_game()
+
+
+def winner():
+    dead_msg = []
+    dead_msg.append("********************************************************\n")
+    dead_msg.append("*************                      *********************\n")
+    dead_msg.append("************* ******************** *********************\n")
+    dead_msg.append("************* *****   !!   ******* *********************\n")
+    dead_msg.append("************* ***** WINNER ******* *********************\n")
+    dead_msg.append("************* ******************** *********************\n")
+    dead_msg.append("*************                      *********************\n")
+    dead_msg.append("********************************************************\n")
+    dead_msg.append("                EXIT? Press q                           \n")
+
+    dead_msg_copy = dead_msg.copy()
+
+    while True:
+        for i in range(0, 8):
+            line = dead_msg[i]
+            for x in range(len(line) - 1):
+                sleep(0.05)
+                if line[x + 1] != "\n":
+                    dead_msg_copy[i] = line[:x] + "_" + line[x + 1 :]
+                clear()
+                print("".join(x for x in dead_msg_copy))
+                if EXIT:
+                    break
+            if EXIT:
+                break
+        if EXIT:
+            break
 
 
 def dead():
@@ -300,7 +337,12 @@ def print_game():
     global MAP, PLAYER, CHANGE
 
     while True:
-        if PLAYER.get_dead() is True or SERVER_ON is False or GAME_END is True:
+        if (
+            PLAYER.get_dead() is True
+            or SERVER_ON is False
+            or GAME_END is True
+            or WINNER is True
+        ):
             break
         if CHANGE:
             clear()
@@ -311,6 +353,28 @@ def print_game():
             CHANGE = not CHANGE
     if PLAYER.get_dead():
         dead()
+    if WINNER:
+        winner()
+
+
+def read_winner_cli():
+    """
+    Function to read the winner of the game.
+    """
+    global WINNER
+    consumer = KafkaConsumer(
+        "winner_{}".format(PLAYER.get_alias()[0].lower()),
+        bootstrap_servers=KAFKA_SERVER,
+        consumer_timeout_ms=3000,
+    )
+
+    while True:
+        for msg in consumer:
+            msg_ = msg.value.decode(FORMAT)
+            if msg_ == "1":
+                WINNER = True
+        if EXIT or SERVER_ON is False or GAME_END:
+            break
 
 
 def read_weather_cli():
@@ -453,7 +517,7 @@ def play_game():
 
 ########## MAIN ##########
 if len(sys.argv) == 2:
-
+    wait_error = True  # Es del revés i know
     threading.Thread(target=read_server_cli, args=()).start()
     opcion = -1
     while opcion != 4:

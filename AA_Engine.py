@@ -27,6 +27,7 @@ if len(sys.argv) == 2:
     MAX_USERS = JSON_CFG["MAX_USERS"]
     TIME_WAIT_SEC = JSON_CFG["TIME_WAIT_SEC"]
     HEADER = JSON_CFG["HEADER"]
+    RESET = JSON_CFG["RESET"]
 
 
 MAP = Map()
@@ -41,6 +42,35 @@ sys.path.append("src/exceptions")
 
 players_dict = {}
 npc_dict = {}
+
+
+def reset_map():
+    global MAP
+    read_players()
+    MAP = read_map()
+
+
+def save_state_map():
+    while True:
+        sleep(5)
+        save_map(MAP)
+        save_players(players_dict)
+
+
+def see_winner():
+    print("[SEARCHING WINNER] Started searching a winner.")
+    while True:
+        sleep(5)
+        alias_alive = []
+        for key in players_dict.keys():
+            if players_dict[key].get_dead() is False:
+                alias_alive.append(key)
+        if len(alias_alive) == 1:
+            producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+            while True:
+                producer.send(
+                    "winner_{}".format(alias_alive[0][0].lower()), "1".encode(FORMAT)
+                )
 
 
 def connect_db(name=None):
@@ -79,7 +109,6 @@ def create_map():
     connection = sqlite3.connect(DB_SERVER)
     cursor = connection.cursor()
 
-    cursor.execute("delete from map_engine;")
     connection.commit()
     save_map(map_engine)
     global MAP
@@ -102,7 +131,6 @@ def actualize_players_position():
     cursor = connection.cursor()
     id_rows = cursor.execute("select * from players where active = 1").fetchall()
     map_ = read_map()
-    cursor.execute("delete from map_engine;")
     for row in id_rows:
         x, y = random.randint(1, 18), random.randint(1, 18)
         if row[0] in players_dict.keys():
@@ -120,10 +148,55 @@ def save_map(map_to_saved):
     cursor = connection.cursor()
 
     cursor.execute(
-        "insert into map_engine(map) values('{}')".format(map_to_saved.to_raw_string())
+        "update map_engine set map='{}' where id={};".format(
+            map_to_saved.to_raw_string(), 0
+        )
     )
 
     connection.commit()
+    connection.close()
+
+
+def save_players(dict_players):
+    connection = sqlite3.connect(DB_SERVER)
+    cursor = connection.cursor()
+
+    for key in list(dict_players.keys()):
+        player = dict_players[key]
+        cursor.execute(
+            "update players set level={}, ec={}, ef={}, dead={}, active=1 where alias='{}';".format(
+                player.get_level(),
+                player.get_cold(),
+                player.get_hot(),
+                int(player.get_dead()),
+                player.get_alias(),
+            )
+        )
+
+    connection.commit()
+    connection.close()
+
+
+def read_players():
+    global players_dict
+    connection = sqlite3.connect(DB_SERVER)
+    cursor = connection.cursor()
+
+    cursor.execute("select * from players where active=1")
+
+    players_msg = cursor.fetchall()
+    for player_msg in players_msg:
+        player = Player()
+        player.set_alias(player_msg[0])
+        player.set_level(player_msg[2])
+        player.set_cold(player_msg[3])
+        player.set_hot(player_msg[4])
+        if player_msg[5] == 0:
+            player.set_dead(False)
+        else:
+            player.set_dead(True)
+        players_dict[player.get_alias()] = player
+
     connection.close()
 
 
@@ -188,7 +261,7 @@ def read_map(ddbb_server=None):
     try:
         cursor, connection = connect_db(DB_SERVER)
 
-        cursor.execute("select * from map_engine order by id desc")
+        cursor.execute("select * from map_engine where id =0")
 
         map_str = cursor.fetchone()[1]
 
@@ -242,7 +315,15 @@ def read_client(alias, passwd) -> Player:
 
         if player_string:
             if player_string[0] == alias and player_string[1] == passwd:
-                player = Player(player_string, ddbb=True)
+                player = Player()
+                player.set_alias(player_string[0])
+                player.set_level(player_string[2])
+                player.set_cold(player_string[3])
+                player.set_hot(player_string[4])
+                if player_string[5] == 0:
+                    player.set_dead(False)
+                else:
+                    player.set_dead(True)
                 return player
             else:
                 print("[WARNING] Player not found.")
@@ -507,11 +588,19 @@ def login_client(connection, address):
             params_login = msg.split(",")
             if params_login[0] == "3":
                 player = read_client(params_login[1], params_login[2])
-                if player is not None:
-                    player.reset_game()
-                    players_dict[player.get_alias()] = player
+                if player is not None or (
+                    player.get_alias() not in players_dict and RESET == "YES"
+                ):
+                    # TODO Mirar recien sacado
+                    if RESET == "NO" or MAX_USERS <= len(players_dict.keys()):
+                        player.reset_game()
+                        players_dict[player.get_alias()] = player
                     connection.send(dict_sockets()["Correct"].encode(FORMAT))
-                    connection.send(string_format_player(player).encode(FORMAT))
+                    connection.send(
+                        string_format_player(players_dict[player.get_alias()]).encode(
+                            FORMAT
+                        )
+                    )
                     print(
                         "[LOGIN] User with IP {} and alias {} have logged in.".format(
                             address[0], player.get_alias()
@@ -616,11 +705,16 @@ def execute_threads_start_game():
     # Send players kafka
     threading.Thread(target=send_dict_players, args=()).start()
     # Random players distribution
-    threading.Thread(target=random_player_distribution, args=()).start()
+    if RESET == "NO":
+        threading.Thread(target=random_player_distribution, args=()).start()
     # Manage NPCs
     threading.Thread(target=manage_npcs, args=()).start()
     # Send npcs kafka
     threading.Thread(target=send_dict_npc, args=()).start()
+    # Save state
+    threading.Thread(target=save_state_map, args=()).start()
+    # See winner
+    threading.Thread(target=see_winner, args=()).start()
 
 
 def wait_server():
@@ -880,7 +974,10 @@ if len(sys.argv) == 2:
 
     print("[STARTING] Inicializando AA_Engine Socket Server")
     try:
-        threading.Thread(target=create_map, args=()).start()  # Creamos mapa
+        if RESET == "NO":
+            threading.Thread(target=create_map, args=()).start()  # Creamos mapa
+        else:
+            threading.Thread(target=reset_map, args=()).start()  # Reseteamos estado
         threading.Thread(target=wait_server, args=()).start()
         threading.Thread(target=send_server_active, args=()).start()
 
@@ -896,5 +993,7 @@ if len(sys.argv) == 2:
         server.close()
     except KeyboardInterrupt:
         print("[POWER OFF] Apagando el servidor...")
+    except ConnectionAbortedError:
+        print("CONEXION YA EN USO.")
 else:
     print("Usage: python3 AA_Engine.py <config.json>")
