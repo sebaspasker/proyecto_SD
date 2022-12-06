@@ -15,7 +15,8 @@ data = {
     "TIME_WAIT_SEC": 10,
     "HEADER": 64,
     "NUMBER_NPC": 4,
-    "RESET": "YES",
+    "RESET": "NO",
+    "CITIES_JSON": "./json/cities.json",
 }
 
 # COPIAR CUANDO CAMBIEMOS PARÁMETROS
@@ -36,6 +37,6 @@ data_lab = {
     "RESET": "NO",
 }
 
-with open("./config/config_lab.json", "w") as outfile:
-    str_ = json.dumps(data_lab)
+with open("./config/config.json", "w") as outfile:
+    str_ = json.dumps(data)
     outfile.write(str_)

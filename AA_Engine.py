@@ -1,10 +1,13 @@
+import ast
 import json
 import socket
 import sqlite3
 import sys
 import threading
 import random
+import requests
 from time import sleep, time
+from pprint import pprint
 from src.Map import Map
 from src.Player import Player
 from src.NPC import NPC
@@ -12,6 +15,7 @@ from src.utils.Sockets_dict import dict_sockets
 from src.utils.Sockets_dict import dict_send_error
 from src.utils.Process_position import process_position
 from kafka import KafkaProducer, KafkaConsumer
+
 
 if len(sys.argv) == 2:
     with open(sys.argv[1]) as f:
@@ -28,7 +32,7 @@ if len(sys.argv) == 2:
     TIME_WAIT_SEC = JSON_CFG["TIME_WAIT_SEC"]
     HEADER = JSON_CFG["HEADER"]
     RESET = JSON_CFG["RESET"]
-
+    CITIES_JSON = JSON_CFG["CITIES_JSON"]
 
 MAP = Map()
 WEATHER_DICT = {}
@@ -922,7 +926,33 @@ def handle_client_old(connection, address):
                     connection.send(dict_sockets()["Incorrect"].encode(FORMAT))
 
 
+def read_cities_json():
+    # TODO Change
+    CITIES_JSON = "./json/cities.json"
+    if CITIES_JSON is not None:
+        with open(CITIES_JSON) as f:
+            cities_raw = f.read()
+            cities = ast.literal_eval(cities_raw)["cities"]
+            return [cities[random.randint(0, len(cities) - 1)] for i in range(0, 4)]
+    else:
+        return None
+
+
 def weather_socket():
+    global WEATHER_DICT
+    WEATHER_DICT = {}
+    API_key = "918362daf2a730b6097828f5ad32be49"
+    base_url = "http://api.openweathermap.org/data/2.5/weather?"
+    city_names = read_cities_json()
+    print(city_names)
+    for city in city_names:
+        final_url = base_url + "appid=" + API_key + "&q=" + city
+        weather_data = requests.get(final_url).json()
+        WEATHER_DICT[city] = round(float(weather_data["main"]["temp"]) - 273.0, 2)
+
+
+@DeprecationWarning
+def weather_socket_old():
     """
     Process AA_Weather saving 4 cities and they temperatures.
     """
