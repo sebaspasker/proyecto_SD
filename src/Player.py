@@ -156,9 +156,9 @@ class Player:
 
     def set_level(self, level_input):
         if level_input < 0:
-            raise OutOfRangeException("Level should be higher or equal to 0")
-
-        self.level = level_input
+            self.level = 0
+        else:
+            self.level = level_input
 
     def set_cold(self, cold_input):
         if cold_input >= -10 and cold_input <= 10:

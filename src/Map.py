@@ -193,6 +193,77 @@ class Map:
             else:
                 print(char, end="")
 
+    def change_station(self, old_position, new_position):
+        if self.weather is None:
+            return None
+        keys_weather = list(self.weather.keys())
+        # Arriba izquierda-derecha
+        if (
+            old_position[1] == 9
+            and old_position[0] <= 9
+            and new_position[1] == 10
+            and new_position[0] <= 9
+        ):
+            return self.weather[keys_weather[1]]
+        # Arriba derecha-izquierda
+        elif (
+            old_position[1] == 10
+            and old_position[0] <= 9
+            and new_position[1] == 9
+            and new_position[0] <= 9
+        ):
+            return self.weather[keys_weather[0]]
+        # Abajo izquierda-derecha
+        elif (
+            old_position[1] == 9
+            and old_position[0] >= 10
+            and new_position[1] == 10
+            and new_position[0] >= 10
+        ):
+            return self.weather[keys_weather[3]]
+        # Abajo derecha-izquierda
+        elif (
+            old_position[1] == 10
+            and old_position[0] >= 10
+            and new_position[1] == 9
+            and new_position[0] >= 10
+        ):
+            return self.weather[keys_weather[2]]
+        # Izquierda arriba-abajo
+        elif (
+            old_position[1] <= 9
+            and old_position[0] == 9
+            and new_position[1] <= 9
+            and new_position[0] == 10
+        ):
+            return self.weather[keys_weather[2]]
+        # Izquierda abajo-arriba
+        elif (
+            old_position[1] <= 9
+            and old_position[0] == 10
+            and new_position[1] <= 9
+            and new_position[0] == 9
+        ):
+            return self.weather[keys_weather[0]]
+        # Derecha arriba-abajo
+        elif (
+            old_position[1] >= 10
+            and old_position[0] == 9
+            and new_position[1] >= 10
+            and new_position[0] == 10
+        ):
+            return self.weather[keys_weather[3]]
+        # Derecha abajo-arriba
+        elif (
+            old_position[1] >= 10
+            and old_position[0] == 10
+            and new_position[1] >= 10
+            and new_position[0] == 9
+        ):
+            return self.weather[keys_weather[1]]
+        else:
+            return None
+
     @DeprecationWarning
     def distribute_ids(self, list_ids):
         """
@@ -372,16 +443,13 @@ class Map:
         char_player2 = self.get_map_matrix(new_position[0], new_position[1])
         player2 = search_players_dict(char_player2, players_dict)
 
-        w_1 = self.sum_weather(old_position, player)
-        w_2 = self.sum_weather(new_position, player2)
-
-        if player.get_level() + w_1 > player2.get_level() + w_2:
+        if player.get_level() > player2.get_level():
             self.set_map_matrix(old_position[0], old_position[1], " ")
             self.set_map_matrix(
                 new_position[0], new_position[1], player.get_alias().lower()[0]
             )
             player2.set_dead(True)
-        elif player.get_level() + w_1 < player2.get_level() + w_2:
+        elif player.get_level() < player2.get_level():
             self.set_map_matrix(old_position[0], old_position[1], " ")
             player.set_dead(True)
 
@@ -395,13 +463,12 @@ class Map:
         """
         char_player2 = self.get_map_matrix(new_position[0], new_position[1])
         player2 = search_players_dict(char_player2, players_dict)
-        w_2 = self.sum_weather(new_position, player2)
 
-        if npc.get_level() > player2.get_level() + w_2:
+        if npc.get_level() > player2.get_level():
             self.set_map_matrix(old_position[0], old_position[1], " ")
             self.set_map_matrix(new_position[0], new_position[1], str(npc.get_level()))
             player2.set_dead(True)
-        elif npc.get_level() < player2.get_level() + w_2:
+        elif npc.get_level() < player2.get_level():
             self.set_map_matrix(old_position[0], old_position[1], " ")
             npc.set_dead(True)
 
@@ -416,8 +483,7 @@ class Map:
                 npc_fight = npc
                 break
         if npc_fight is not None:
-            w_1 = self.sum_weather(old_position, player)
-            if player.get_level() + w_1 > npc_fight.get_level():
+            if player.get_level() > npc_fight.get_level():
                 self.set_map_matrix(old_position[0], old_position[1], " ")
                 self.set_map_matrix(
                     new_position[0], new_position[1], player.get_alias().lower()[0]
@@ -425,7 +491,7 @@ class Map:
                 npc.set_dead(True)
                 npc_dict[npc.get_alias] = npc
 
-            elif player.get_level() + w_1 < npc_fight.get_level():
+            elif player.get_level() < npc_fight.get_level():
                 self.set_map_matrix(old_position[0], old_position[1], " ")
                 player.set_dead(True)
 
@@ -444,6 +510,19 @@ class Map:
             self.evaluate_mine(old_position, new_position, player)
         elif new_position_object == "NPC":
             self.evaluate_npc(old_position, new_position, player, npc_dict)
+
+        weather = self.change_station(old_position, new_position)
+        if weather is not None:
+            if weather <= 10:
+                if player.level + player.get_cold() < 0:
+                    player.level = 0
+                else:
+                    player.level += player.get_cold()
+            elif weather >= 25:
+                if player.level + player.get_hot() < 0:
+                    player.level = 0
+                else:
+                    player.level += player.get_hot()
 
     def evaluate_move_npc(
         self, old_position, new_position, npc, players_dict, npc_dict
