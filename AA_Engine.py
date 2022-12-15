@@ -52,8 +52,10 @@ npc_dict = {}
 
 ####### NEW UPDATE P3 #######
 def save_map_and_weather_json():
-    with open(JSON_MAP, "w") as f:
-        json.dump({"map": MAP.to_raw_string(), "weather": WEATHER_DICT}, f)
+    while True:
+        sleep(1)
+        with open(JSON_MAP, "w") as f:
+            json.dump({"map": MAP.to_raw_string(), "weather": WEATHER_DICT}, f)
 
 
 def save_dict_players_json():
@@ -340,6 +342,7 @@ def read_client(alias, passwd) -> Player:
             if player_string[0] == alias and player_string[1] == passwd:
                 player = Player()
                 player.set_alias(player_string[0])
+                player.set_password(player_string[1])
                 player.set_level(player_string[2])
                 player.set_cold(player_string[3])
                 player.set_hot(player_string[4])
@@ -384,7 +387,6 @@ def send_map(server=None):
         wait_until_change()
         try:
             producer.send("map_engine", MAP.to_raw_string().encode(FORMAT))
-            save_map_and_weather_json()
             CHANGE = False
         except ValueError as VE:
             print("VALUE ERROR: Cerrando engine...")
@@ -740,6 +742,8 @@ def execute_threads_start_game():
     threading.Thread(target=save_state_map, args=()).start()
     # See winner
     threading.Thread(target=see_winner, args=()).start()
+    ######## P3 ########
+    threading.Thread(target=save_map_and_weather_json, args=()).start()
 
 
 def wait_server():
@@ -965,11 +969,23 @@ def weather_socket():
     API_key = "918362daf2a730b6097828f5ad32be49"
     base_url = "http://api.openweathermap.org/data/2.5/weather?"
     city_names = read_cities_json()
-    print(city_names)
     for city in city_names:
         final_url = base_url + "appid=" + API_key + "&q=" + city
         weather_data = requests.get(final_url).json()
         WEATHER_DICT[city] = round(float(weather_data["main"]["temp"]) - 273.0, 2)
+    city_keys = list(WEATHER_DICT.keys())
+    print(
+        "[CONNECTED WEATHER] Cities choosen: {}({}), {}({}), {}({}), {}({})".format(
+            city_keys[0],
+            WEATHER_DICT[city_keys[0]],
+            city_keys[1],
+            WEATHER_DICT[city_keys[1]],
+            city_keys[2],
+            WEATHER_DICT[city_keys[2]],
+            city_keys[3],
+            WEATHER_DICT[city_keys[3]],
+        )
+    )
 
 
 @DeprecationWarning

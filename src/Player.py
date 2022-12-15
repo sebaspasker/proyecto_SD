@@ -1,8 +1,8 @@
-# TODO Search correct exception route
 from .exceptions.none_value_exception import NoneValueException
 from .exceptions.incorrect_format import IncorrectFormatException
 from .exceptions.out_of_range_exception import OutOfRangeException
 from random import randint
+import hashlib
 import sys
 
 sys.path.append("../")
@@ -27,12 +27,14 @@ def fight(player_1, player_2):
 class Player:
     # position = (1, 1)
     alias = ""
+    password = ""
     level = 0
     cold = 0
     hot = 0
     dead = False
 
     def __init__(self, string_list=None, ddbb=False):
+        # TODO Cambiar para que añada el password
         if string_list is not None:
             if not ddbb:
                 self.set_alias(string_list[0])
@@ -154,6 +156,9 @@ class Player:
 
         self.alias = alias_input
 
+    def set_password(self, password):
+        self.password = password
+
     def set_level(self, level_input):
         if level_input < 0:
             self.level = 0
@@ -181,6 +186,9 @@ class Player:
     def get_position(self):
         return self.position
 
+    def get_password(self):
+        return hashlib.md5(self.password.encode()).hexdigest()
+
     def get_alias(self):
         return self.alias
 
@@ -195,3 +203,13 @@ class Player:
 
     def get_dead(self):
         return self.dead
+
+    def get_dict(self):
+        return {
+            "alias": self.get_alias(),
+            "password": self.get_password(),
+            "level": self.get_level(),
+            "cold": self.get_cold(),
+            "hot": self.get_hot(),
+            "dead": self.get_dead(),
+        }
