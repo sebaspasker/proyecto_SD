@@ -59,11 +59,13 @@ def save_map_and_weather_json():
 
 
 def save_dict_players_json():
-    with open(JSON_USERS, "w") as f:
-        dict_json = {}
-        for key in players_dict:
-            dict_json[key] = players_dict[key].get_dict()
-        json.dump(dict_json, f)
+    while True:
+        sleep(1)
+        with open(JSON_USERS, "w") as f:
+            dict_json = {}
+            for key in players_dict:
+                dict_json[key] = players_dict[key].get_dict()
+            json.dump(dict_json, f)
 
 
 #############################
