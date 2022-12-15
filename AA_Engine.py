@@ -33,6 +33,9 @@ if len(sys.argv) == 2:
     HEADER = JSON_CFG["HEADER"]
     RESET = JSON_CFG["RESET"]
     CITIES_JSON = JSON_CFG["CITIES_JSON"]
+    # TODO Cambiar a parámetro de json
+    JSON_MAP = "./json/map.json"
+    JSON_USERS = "./json/users.json"
 
 MAP = Map()
 WEATHER_DICT = {}
@@ -46,6 +49,22 @@ sys.path.append("src/exceptions")
 
 players_dict = {}
 npc_dict = {}
+
+####### NEW UPDATE P3 #######
+def save_map_and_weather_json():
+    with open(JSON_MAP, "w") as f:
+        json.dump({"map": MAP.to_raw_string(), "weather": WEATHER_DICT}, f)
+
+
+def save_dict_players_json():
+    with open(JSON_USERS, "w") as f:
+        dict_json = {}
+        for key in players_dict:
+            dict_json[key] = players_dict[key].get_dict()
+        json.dump(dict_json, f)
+
+
+#############################
 
 
 def reset_map():
@@ -365,6 +384,7 @@ def send_map(server=None):
         wait_until_change()
         try:
             producer.send("map_engine", MAP.to_raw_string().encode(FORMAT))
+            save_map_and_weather_json()
             CHANGE = False
         except ValueError as VE:
             print("VALUE ERROR: Cerrando engine...")
@@ -414,10 +434,11 @@ def send_weather(server=None):
                 .encode(FORMAT),
             )
             sleep(1)
-        except:
+        except e:
             print(
                 "[WEATHER SEND ERROR] Ha habido un error a la hora de enviar el weather..."
             )
+            print(e)
 
             break
 
@@ -838,6 +859,7 @@ def send_dict_players():
     Send players to kafka producer by client.
     """
 
+    save_dict_players_json()
     producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
     while True:
         sleep(1)
@@ -927,13 +949,12 @@ def handle_client_old(connection, address):
 
 
 def read_cities_json():
-    # TODO Change
     CITIES_JSON = "./json/cities.json"
     if CITIES_JSON is not None:
         with open(CITIES_JSON) as f:
             cities_raw = f.read()
             cities = ast.literal_eval(cities_raw)["cities"]
-            return [cities[random.randint(0, len(cities) - 1)] for i in range(0, 4)]
+            return random.sample(cities, 4)
     else:
         return None
 

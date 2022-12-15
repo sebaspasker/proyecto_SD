@@ -11,7 +11,9 @@ from src.utils.Clear import clear
 from src.utils.Process_position import position_str
 import ast
 import json
+import urllib3
 import threading
+import requests
 import socket
 import sys
 from waiting import wait
@@ -58,6 +60,23 @@ def reset_values():
     WINNER = False
 
 
+########## UPDATE P3 #########
+def create_user_api():
+    # Comprobamos estado del servidor
+    try:
+        response = requests.get("http://localhost:8080/registry")
+    except Exception as e:
+        print("Server not connected. Connect server.")
+
+    print("Creación de usuario por api:")
+    print("Introduzca alias:")
+    alias = input()
+    passwd = getpass(prompt="Contraseña:")
+
+
+#############################
+
+
 # Función para enviar mensajes cliente
 def send(msg, client):
     message = msg.encode(FORMAT)
@@ -73,7 +92,11 @@ def menu():
     print("1. Crear perfil")
     print("2. Editar perfil")
     print("3. Unirse a la partida")
-    print("4. Salir del juego")
+    print("4. Crear perfil API")
+    print("5. Editar perfil API")
+    print("6. Borrar perfil API")
+    print("7. Unirse a la partida API")
+    print("8. Salir")
     print("Opción: ", end=" ")
 
 
@@ -546,6 +569,8 @@ if len(sys.argv) == 2:
                 clear()
                 print("Partida terminada... Te esperamos de nuevo!")
         elif opcion == "4":
+            create_user_api()
+        elif opcion == 8:
             EXIT_ALL = True
             break
 

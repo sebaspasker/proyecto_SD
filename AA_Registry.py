@@ -14,12 +14,13 @@ if len(sys.argv) == 2:
     SERVER = JSON_CFG["IP_REG"]
     PORT = JSON_CFG["PORT_REG"]
     FORMAT = JSON_CFG["FORMAT"]
+    DB_SERVER = JSON_CFG["DB_SERVER"]
 
 # Función para crear un nuevo jugador en la bd
 def crearPerfil(lista: List, conn):
     try:
         # Conexión a la bd
-        connection = sqlite3.connect("againstall.db")
+        connection = sqlite3.connect(DB_SERVER)
 
         # Cursor para realizar los comandos de la bd
         cursor = connection.cursor()
@@ -50,7 +51,7 @@ def crearPerfil(lista: List, conn):
 def editarPerfil(lista: List, conn):
     try:
         # Conexión a la bd
-        connection = sqlite3.connect("againstall.db")
+        connection = sqlite3.connect(DB_SERVER)
 
         # Cursor para realizar los comandos de la bd
         cursor = connection.cursor()
