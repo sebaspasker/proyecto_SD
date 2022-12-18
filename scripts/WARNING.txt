@@ -1,0 +1,8 @@
+------------------------------------------------------------------------------------------
+																		WARNING
+
+Correr scripts en directorio base (./sd), no en el directorio de los scripts (./sd/scripts)
+para su correcto funcionamiento
+
+------------------------------------------------------------------------------------------
+
