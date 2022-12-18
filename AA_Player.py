@@ -20,6 +20,11 @@ from waiting import wait
 
 term = blessed.Terminal()
 
+# Deshabilitamos Warnings
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 if len(sys.argv) == 2:
     with open(sys.argv[1]) as f:
         JSON_CFG = json.load(f)
@@ -61,21 +66,142 @@ def reset_values():
 
 
 ########## UPDATE P3 #########
+def get_user_api():
+    """
+    Obtiene un usuario mediante API.
+    """
+
+    try:
+        requests.get("https://localhost:8080/registry", verify=False)
+
+        print("Obtención de usuario mediante API.")
+
+        print("Introduzca alias:")
+        alias = input()
+        response = requests.get(
+            "https://localhost:8080/registry/{}".format(alias), verify=False
+        )
+
+        if response.status_code == 200:
+            json_user = response.json()
+            print(
+                "\nUsuario {alias}:\nLEVEL:{level}\nCOLD:{cold}\nHOT:{hot}\nDEAD:{dead}\n\n".format(
+                    alias=json_user["alias"],
+                    level=json_user["level"],
+                    cold=json_user["cold"],
+                    hot=json_user["hot"],
+                    dead=json_user["dead"],
+                )
+            )
+        elif response.status_code == 400:
+            print("No existe el usuario.")
+        else:
+            print("No se ha podido obtener al usuario.")
+
+    except Exception as e:
+        print("Servidor API no conectado.")
+        raise e
+
+
 def create_user_api():
+    """
+    Crea un usuario mediante API.
+    """
     # Comprobamos estado del servidor
     try:
-        response = requests.get("http://localhost:8080/registry")
-    except Exception as e:
-        print("Server not connected. Connect server.")
+        response = requests.get("https://localhost:8080/registry", verify=False)
 
-    print("Creación de usuario por api:")
-    print("Introduzca alias:")
-    alias = input()
-    passwd = getpass(prompt="Contraseña:")
+        print("Creación de usuario por api:")
+        print("Introduzca alias:")
+        alias = input()
+        passwd = getpass(prompt="Contraseña:")
+        if (
+            requests.get(
+                "https://localhost:8080/registry/{}".format(alias), verify=False
+            ).status_code
+            == 404
+        ):
+            response = requests.post(
+                "https://localhost:8080/registry",
+                data={"alias": alias, "password": passwd},
+                verify=False,
+            )
+            print("Usuario creado con exito.")
+        else:
+            print("Ya existe el usuario")
+    except Exception as e:
+        print("ERROR - API Server not connected. Connect server.")
+
+
+def edit_user_api():
+    """
+    Modifica un usuario mediante API.
+    """
+    try:
+        response = requests.get("https://localhost:8080/registry", verify=False)
+
+        print("Edición de usuario por api:")
+        print("Introduzca alias:")
+        alias = input()
+        passwd = getpass(prompt="Nueva contraseña:")
+        if (
+            requests.get(
+                "https://localhost:8080/registry/{}".format(alias), verify=False
+            ).status_code
+            == 200
+        ):
+            if (
+                requests.put(
+                    "https://localhost:8080/registry/{}".format(alias),
+                    data={"password": passwd},
+                    verify=False,
+                ).status_code
+                != 200
+            ):
+                print("ERROR - No se ha podido modificar el usuario")
+            else:
+                print("Usuario editado con éxito.")
+        else:
+            print("ERROR - Usuario no encontrado.")
+
+    except Exception as e:
+        print("API Server not connected. Connect server.")
+
+
+def delete_user_api():
+    """
+    Elimina un usuario mediante API.
+    """
+
+    try:
+        response = requests.get("https://localhost:8080/registry", verify=False)
+
+        print("Eliminar usuario:")
+        print("Introduzca alias:")
+
+        alias = input()
+        if (
+            requests.get(
+                "https://localhost:8080/registry/{}".format(alias), verify=False
+            ).status_code
+            == 200
+        ):
+            status = requests.delete(
+                "https://localhost:8080/registry/{}".format(alias), verify=False
+            ).status_code
+            if status != 200:
+                print("Usuario no se ha podido eliminar..")
+            else:
+                print("Usuario eliminado con exito.")
+        else:
+            print("No existe el usuario.")
+    except Exception as e:
+        print("API Server not connected.")
 
 
 #############################
 
+# TODO Encriptar sockets
 
 # Función para enviar mensajes cliente
 def send(msg, client):
@@ -95,8 +221,9 @@ def menu():
     print("4. Crear perfil API")
     print("5. Editar perfil API")
     print("6. Borrar perfil API")
-    print("7. Unirse a la partida API")
-    print("8. Salir")
+    print("7. Obtener usuario API")
+    print("8. Unirse a la partida API")
+    print("9. Salir")
     print("Opción: ", end=" ")
 
 
@@ -473,19 +600,24 @@ def send_move_cli():
 def read_server_cli():
     global GAME_STARTED, TIMESERVER
 
-    consumer = KafkaConsumer(
-        "server", bootstrap_servers=KAFKA_SERVER, consumer_timeout_ms=3000
-    )
-    while True:
-        for msg in consumer:
-            SERVER_ON = True
-            msg_ = msg.value.decode(FORMAT).split(",")
-            if msg_[0] == "2":
-                GAME_STARTED = True
-            TIMESERVER = float(msg_[1])
-        SERVER_ON = False
-        if EXIT_ALL is True:
-            break
+    try:
+        consumer = KafkaConsumer(
+            "server", bootstrap_servers=KAFKA_SERVER, consumer_timeout_ms=3000
+        )
+        while True:
+            for msg in consumer:
+                SERVER_ON = True
+                msg_ = msg.value.decode(FORMAT).split(",")
+                if msg_[0] == "2":
+                    GAME_STARTED = True
+                TIMESERVER = float(msg_[1])
+            SERVER_ON = False
+            if EXIT_ALL is True:
+                break
+    except Exception as e:
+        print(
+            "\n\nEl Servidor de KAFKA seguramente no esté corriendo. Algunas funcionalidades de la aplicación no funcionarán.\n"
+        )
 
 
 def read_player_cli():
@@ -569,8 +701,18 @@ if len(sys.argv) == 2:
                 clear()
                 print("Partida terminada... Te esperamos de nuevo!")
         elif opcion == "4":
+            clear()
             create_user_api()
-        elif opcion == 8:
+        elif opcion == "5":
+            clear()
+            edit_user_api()
+        elif opcion == "6":
+            clear()
+            delete_user_api()
+        elif opcion == "7":
+            clear()
+            get_user_api()
+        elif opcion == "9":
             EXIT_ALL = True
             break
 
