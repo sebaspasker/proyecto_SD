@@ -1,10 +1,20 @@
 import json
+import logging
 import threading
 import socket
 import sqlite3
 import sys
 from typing import List
 from sqlite3.dbapi2 import Error
+
+logging.basicConfig(
+    filename="./logs/sockets_registry.log",
+    filemode="w",
+    format="%(asctime)s - %(levelname)s - %(clientip)s - %(message)s",
+)
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
 
 if len(sys.argv) == 2:
     with open(sys.argv[1]) as f:
@@ -17,8 +27,12 @@ if len(sys.argv) == 2:
     DB_SERVER = JSON_CFG["DB_SERVER"]
 
 # Función para crear un nuevo jugador en la bd
-def crearPerfil(lista: List, conn):
+def crearPerfil(lista: List, conn, addr):
     try:
+        logger.info(
+            "Creación de perfil, alias: {}".format(lista[1]),
+            extra={"clientip": addr},
+        )
         # Conexión a la bd
         connection = sqlite3.connect(DB_SERVER)
 
@@ -38,9 +52,16 @@ def crearPerfil(lista: List, conn):
 
         # Hago commit para guardar los datos en la bd
         connection.commit()
+        logger.info(
+            "Perfil creado con éxito, alias: {}".format(lista[1]),
+            extra={"clientip": addr},
+        )
     except Error as e:
-        print("ERROR: No se ha podido añadir usuario")
-        print(e)
+        print("ERROR: No se ha podido añadir el usuario")
+        logger.error(
+            "No se ha podido añadir el usuario con alias: {}".format(lista[1]),
+            extra={"clientip": addr},
+        )
         conn.send("Error".encode(FORMAT))
     finally:
         cursor.close()
@@ -48,8 +69,12 @@ def crearPerfil(lista: List, conn):
 
 
 # Función para cambiar la contraseña a un jugador
-def editarPerfil(lista: List, conn):
+def editarPerfil(lista: List, conn, addr):
     try:
+        logger.info(
+            "Edición de perfil, alias: {}".format(lista[1]),
+            extra={"clientip": addr},
+        )
         # Conexión a la bd
         connection = sqlite3.connect(DB_SERVER)
 
@@ -66,12 +91,20 @@ def editarPerfil(lista: List, conn):
             conn.send("ALIAS_NOT_FOUND".encode(FORMAT))
         else:
             conn.send("Perfil editado con éxito.".encode(FORMAT))
+            logger.info(
+                "Perfil editado con éxito, alias: {}".format(lista[1]),
+                extra={"clientip": addr},
+            )
 
         # Hago commit para guardar los datos en la bd
         connection.commit()
 
     except Error as e:
-        conn.send("ERROR".encode(FORMAT))
+        logger.error(
+            "No se ha podido editar el usuario con alias: {}".format(lista[1]),
+            extra={"clientip": addr},
+        )
+        conn.send("Error".encode(FORMAT))
     finally:
         cursor.close()
         connection.close()
@@ -96,12 +129,12 @@ def handleCliente(conn, addr):
 
             if lista[0] == "1":
                 if len(lista) == 3:
-                    crearPerfil(lista, conn)
+                    crearPerfil(lista, conn, addr)
                 else:
                     conn.send("Error".encode(FORMAT))
             elif lista[0] == "2":
                 if len(lista) == 3:
-                    editarPerfil(lista, conn)
+                    editarPerfil(lista, conn, addr)
                 else:
                     conn.send("Error".encode(FORMAT))
 
