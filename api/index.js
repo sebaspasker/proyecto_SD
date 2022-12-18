@@ -34,11 +34,6 @@ var registry = require('./registry.js')
 var map_api = require('./map.js')
 
 // Use the router we defined in registry.js
-api.use('/', (req,res) => {
-	res.send("Inicio.")
-})
-
-// Use the router we defined in registry.js
 api.use('/registry', registry)
 
 api.use('/map', map_api)
@@ -47,6 +42,12 @@ api.use('/map', map_api)
 api.get('/login', (req, res) => {
 	res.sendFile(path.join(__dirname, './views/html/login.html'))
 })
+
+// Use the router we defined in registry.js
+api.get('/', (req,res) => {
+	res.send("Inicio.")
+})
+
 
 const request = require('request');
 const md5 = require('md5');
@@ -98,8 +99,10 @@ api.get('/game', (req,res) => {
 https
 	.createServer(
 		{
-			key: fs.readFileSync("key.pem"),
-			cert: fs.readFileSync("cert.pem"),
+			// key: fs.readFileSync("./pem/key.pem"),
+			// cert: fs.readFileSync("./pem/cert.pem"),
+			key: fs.readFileSync("./pem/certServ.pem"),
+			cert: fs.readFileSync("./pem/certServ.pem"),
 		},
 		api
 	)
