@@ -51,7 +51,7 @@ def read_public_key_bytes(public_key):
 
 def encrypt(public_key, message):
     return public_key.encrypt(
-        message.encode("UTF-8"),
+        message,
         padding.OAEP(
             mgf=padding.MGF1(algorithm=hashes.SHA256()),
             algorithm=hashes.SHA256(),
@@ -69,3 +69,21 @@ def decrypt(private_key, message):
             label=None,
         ),
     )
+
+
+def send_encrypted_message(public_key, message, client):
+    """
+    Encripta un mensaje con la clave pública en RSA y lo envía al servidor.
+    """
+
+    message_encrypted = encrypt(public_key, message.encode("utf-8"))
+    client.send(message_encrypted)
+
+
+def decrypt_recieved_message(private_key, client):
+    """
+    Recibe un mensaje encriptado y lo desencripta con la clave privada.
+    """
+
+    message_encrypted = client.recv(256)
+    return decrypt(private_key, message_encrypted).decode("utf-8")
