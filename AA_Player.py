@@ -9,7 +9,7 @@ from src.Map import Map
 from src.utils.Sockets_dict import dict_sockets
 from src.utils.Clear import clear
 from src.utils.Process_position import position_str
-from src.utils.assymetric_encryption import read_public_key_bytes, encrypt
+from src.utils.assymetric_encryption import *
 import ast
 import json
 import urllib3
@@ -216,9 +216,6 @@ def send(msg, client):
 
 def send_rsa(msg, client):
     message = msg
-    # msg_length = len(message)
-    # send_length = msg_length
-    # client.send(str(send_length).encode(FORMAT) + b" " * (64 - len(str(send_length))))
     client.send(message)
 
 
@@ -253,10 +250,14 @@ def create_user(IP, PORT):
 
     print(f"CONEXIÓN ESTABLECIDA [{ADDR}]")
 
-    import src.Map
-
+    # Recibe clave pública
     public_key_msg = client.recv(2048)  # RSA
-    public_key = read_public_key_bytes(public_key_msg)
+    public_key_reg = read_public_key_bytes(public_key_msg)
+
+    # Crea claves
+    private_key, public_key = create_rsa_key()
+    send_rsa(bytearray(get_public_key_bytes(public_key)), client)
+
     # map_ = Map().to_raw_string()
     # print(len(map_))
     # msg = encrypt(public_key, map_[0:100])
@@ -286,10 +287,12 @@ def create_user(IP, PORT):
 
     # Envío al servidor toda la información necesaria en forma de mensaje
     # El 1 simboliza que la sentencia de SQL a realizar es insert
-    send("1," + alias + "," + password, client)
+    send_encrypted_message(public_key_reg, "1," + alias + "," + password, client)
 
-    if client.recv(2048).decode(FORMAT) == "Error":
+    if decrypt_recieved_message(private_key, client) == "Error":
         print("ERROR: No se ha podido añadir el usuario.")
+    else:
+        print("Perfil creado con exito.")
 
     client.close()
 
@@ -307,16 +310,23 @@ def edit_user(IP, PORT):
         )
         return False
 
-    private_key = client.recv(2048).decode(FORMAT)
-    print(private_key)
+    # Recibe clave pública
+    public_key_msg = client.recv(2048)  # RSA
+    public_key_reg = read_public_key_bytes(public_key_msg)
+
+    # Crea claves
+    private_key, public_key = create_rsa_key()
+    send_rsa(bytearray(get_public_key_bytes(public_key)), client)
 
     print("Opción de edición de usuario:")
     print("Alias: ", end=" ")
     alias = input()
     password = getpass(prompt="Nueva contraseña:")
 
-    send("2," + alias + "," + password, client)
-    msg = client.recv(2048).decode(FORMAT)
+    # send("2," + alias + "," + password, client)
+    send_encrypted_message(public_key_reg, "2," + alias + "," + password, client)
+    msg = decrypt_recieved_message(private_key, client)
+    # msg = client.recv(2048).decode(FORMAT)
 
     if msg == "ALIAS_NOT_FOUND":
         print("ERROR: No se ha podido encontrar el usuario en la base de datos.")
