@@ -9,6 +9,7 @@ from src.Map import Map
 from src.utils.Sockets_dict import dict_sockets
 from src.utils.Clear import clear
 from src.utils.Process_position import position_str
+from src.utils.assymetric_encryption import read_public_key_bytes, encrypt
 import ast
 import json
 import urllib3
@@ -213,6 +214,14 @@ def send(msg, client):
     client.send(message)
 
 
+def send_rsa(msg, client):
+    message = msg
+    # msg_length = len(message)
+    # send_length = msg_length
+    # client.send(str(send_length).encode(FORMAT) + b" " * (64 - len(str(send_length))))
+    client.send(message)
+
+
 def menu():
     print("Elige una opción:")
     print("1. Crear perfil")
@@ -243,6 +252,24 @@ def create_user(IP, PORT):
         return False
 
     print(f"CONEXIÓN ESTABLECIDA [{ADDR}]")
+
+    import src.Map
+
+    public_key_msg = client.recv(2048)  # RSA
+    public_key = read_public_key_bytes(public_key_msg)
+    # map_ = Map().to_raw_string()
+    # print(len(map_))
+    # msg = encrypt(public_key, map_[0:100])
+    # msg_1 = encrypt(public_key, map_[100:200])
+    # msg_2 = encrypt(public_key, map_[200:300])
+    # msg_3 = encrypt(public_key, map_[300:400])
+    # print(
+    #     len(map_[0:100]) + len(map_[100:200]) + len(map_[200:300]) + len(map_[300:400])
+    # )
+    # send_rsa(bytearray(msg), client)
+    # send_rsa(bytearray(msg_1), client)
+    # send_rsa(bytearray(msg_2), client)
+    # send_rsa(bytearray(msg_3), client)
 
     print("Opción de creación de usuario")
     print("Introduzca alias:", end=" ")
@@ -279,6 +306,9 @@ def edit_user(IP, PORT):
             )
         )
         return False
+
+    private_key = client.recv(2048).decode(FORMAT)
+    print(private_key)
 
     print("Opción de edición de usuario:")
     print("Alias: ", end=" ")

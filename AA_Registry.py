@@ -12,7 +12,6 @@ logging.basicConfig(
     filemode="w",
     format="%(asctime)s - %(levelname)s - %(clientip)s - %(message)s",
 )
-
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
@@ -25,6 +24,9 @@ if len(sys.argv) == 2:
     PORT = JSON_CFG["PORT_REG"]
     FORMAT = JSON_CFG["FORMAT"]
     DB_SERVER = JSON_CFG["DB_SERVER"]
+
+PRIVATE_KEY = None
+PUBLIC_KEY = None
 
 # Función para crear un nuevo jugador en la bd
 def crearPerfil(lista: List, conn, addr):
@@ -110,9 +112,40 @@ def editarPerfil(lista: List, conn, addr):
         connection.close()
 
 
+from src.utils.assymetric_encryption import (
+    create_rsa_key,
+    get_public_key_bytes,
+    decrypt,
+    encrypt,
+)
+
+from src.Map import Map
+
 # Función para manejar el mensaje del cliente que se conecta
 def handleCliente(conn, addr):
     print(f"[NUEVA CONEXION] {addr} connected.")
+
+    private_key, public_key = create_rsa_key()
+    conn.send(get_public_key_bytes(public_key))
+    # length = int(conn.recv(HEADER).decode(FORMAT))
+    msg_rsa = conn.recv(256)
+    msg_rsa_1 = conn.recv(256)
+    msg_rsa_2 = conn.recv(256)
+    msg_rsa_3 = conn.recv(256)
+    # print(length)
+    map_ = (
+        decrypt(private_key, msg_rsa).decode("utf-8")
+        + decrypt(private_key, msg_rsa_1).decode("utf-8")
+        + decrypt(private_key, msg_rsa_2).decode("utf-8")
+        + decrypt(private_key, msg_rsa_3).decode("utf-8")
+    )
+
+    print(len(map_))
+
+    map__ = Map(map_)
+
+    map__.set_none_influencial_weather()
+    map__.print_color()
 
     connected = True
     while connected:
