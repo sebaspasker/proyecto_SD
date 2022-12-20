@@ -50,6 +50,9 @@ EXIT = False
 EXIT_ALL = False
 WINNER = False
 
+PRIVATE_KEY = None
+PUBLIC_KEY_ENGINE = None
+
 
 def reset_values():
     global PLAYER, MAP, WEATHER
@@ -198,6 +201,17 @@ def delete_user_api():
             print("No existe el usuario.")
     except Exception as e:
         print("API Server not connected.")
+
+
+def exchange_keys(client):
+    global PRIVATE_KEY, PUBLIC_KEY_ENGINE
+    public_key_engine = read_public_key_bytes(client.recv(512))
+
+    private_key_user, _ = create_rsa_key()
+    send_rsa(bytearray(get_public_key_bytes(private_key_user.public_key())), client)
+
+    PRIVATE_KEY = private_key_user
+    PUBLIC_KEY_ENGINE = public_key_engine
 
 
 #############################
@@ -378,6 +392,7 @@ def login(IP, PORT):
             print("Logueado correctamente al servidor.")
             ply_sck = client.recv(2048).decode(FORMAT)
             PLAYER = process_player(ply_sck)
+            exchange_keys(client)
             start_game()
     elif msg[0] == "-1":
         print(msg[1])

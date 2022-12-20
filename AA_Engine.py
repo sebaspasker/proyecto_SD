@@ -14,6 +14,7 @@ from src.NPC import NPC
 from src.utils.Sockets_dict import dict_sockets
 from src.utils.Sockets_dict import dict_send_error
 from src.utils.Process_position import process_position
+from src.utils.assymetric_encryption import *
 from kafka import KafkaProducer, KafkaConsumer
 
 
@@ -43,12 +44,14 @@ WEATHER_DICT = {}
 CHANGE = False
 WAIT_USER = True
 
+PRIVATE_KEY = None
 
 sys.path.append("src")
 sys.path.append("src/exceptions")
 
 players_dict = {}
 npc_dict = {}
+rsa_dict = {}
 
 ####### NEW UPDATE P3 #######
 def save_map_and_weather_json():
@@ -66,6 +69,16 @@ def save_dict_players_json():
             for key in players_dict:
                 dict_json[key] = players_dict[key].get_dict()
             json.dump(dict_json, f)
+
+
+def exchange_keys(alias, connection):
+    global rsa_dict
+
+    public_key_byte = bytearray(get_public_key_bytes(PRIVATE_KEY.public_key()))
+    connection.send(public_key_byte)
+
+    public_key_cli = read_public_key_bytes(connection.recv(512))
+    rsa_dict[alias] = public_key_cli
 
 
 #############################
@@ -893,6 +906,8 @@ def handle_client(connection, address):
     print("[NEW CONEXION] {} connected.".format(connection))
     alias = login_client(connection, address)
 
+    exchange_keys(alias, connection)
+
     wait_client()
 
 
@@ -1049,6 +1064,7 @@ if len(sys.argv) == 2:
             threading.Thread(target=reset_map, args=()).start()  # Reseteamos estado
         threading.Thread(target=wait_server, args=()).start()
         threading.Thread(target=send_server_active, args=()).start()
+        PRIVATE_KEY, _ = create_rsa_key()
 
         weather_socket()
         server_socket = server_socket()
