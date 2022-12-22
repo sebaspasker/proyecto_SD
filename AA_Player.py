@@ -35,6 +35,7 @@ if len(sys.argv) == 2:
     PORT_REG = JSON_CFG["PORT_REG"]
     KAFKA_SERVER = JSON_CFG["KAFKA_SERVER"]
     FORMAT = JSON_CFG["FORMAT"]
+    PRIVATE_KEY_PLAYER = JSON_CFG["PRIVATE_KEY_USER"]
 
 # GLOBAL VARIABLES
 PLAYER = Player()
@@ -207,7 +208,10 @@ def exchange_keys(client):
     global PRIVATE_KEY, PUBLIC_KEY_ENGINE
     public_key_engine = read_public_key_bytes(client.recv(512))
 
-    private_key_user, _ = create_rsa_key()
+    # private_key_user, _ = create_rsa_key()
+    with open(PRIVATE_KEY_PLAYER, "rb") as f:
+        private_key_user = read_private_key_bytes(f.read())
+
     send_rsa(bytearray(get_public_key_bytes(private_key_user.public_key())), client)
 
     PRIVATE_KEY = private_key_user
@@ -594,7 +598,7 @@ def read_weather_cli():
     for msg in consumer:
         if PLAYER.get_dead() is True or SERVER_ON is False or GAME_END is True:
             break
-        msg_ = msg.value.decode(FORMAT).split(",")
+        msg_ = Decrypt(PRIVATE_KEY, msg.value).decode(FORMAT).split(",")
         weather = {}
         for i in range(1, 9, 2):
             weather[msg_[i]] = msg_[i + 1]
@@ -639,9 +643,12 @@ def send_move_cli():
                 if key == "w" or key == "s" or key == "a" or key == "d":
                     kafka_producer.send(
                         "keys",
-                        "{alias},{key}".format(
-                            alias=PLAYER.get_alias(), key=key
-                        ).encode(FORMAT),
+                        encrypt(
+                            PUBLIC_KEY_ENGINE,
+                            "{alias},{key}".format(
+                                alias=PLAYER.get_alias(), key=key
+                            ).encode(FORMAT),
+                        ),
                     )
             elif not SERVER_ON or EXIT:
                 break
@@ -662,7 +669,7 @@ def read_server_cli():
         while True:
             for msg in consumer:
                 SERVER_ON = True
-                msg_ = msg.value.decode(FORMAT).split(",")
+                msg_ = decrypt(PRIVATE_KEY, msg.value).decode(FORMAT).split(",")
                 if msg_[0] == "2":
                     GAME_STARTED = True
                 TIMESERVER = float(msg_[1])
@@ -688,7 +695,7 @@ def read_player_cli():
     )
 
     for msg in kafka_consumer:
-        msg_split = msg.value.decode(FORMAT).split(",")
+        msg_split = decrypt(PRIVATE_KEY, msg.value).decode(FORMAT).split(",")
         msg_split.pop(0)
         PLAYER = Player(msg_split)
         CHANGE = True

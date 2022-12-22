@@ -17,6 +17,7 @@ data = {
     "NUMBER_NPC": 4,
     "RESET": "NO",
     "CITIES_JSON": "./json/cities.json",
+    "PRIVATE_KEY_USER": "./pem/private_key_player.pem",
 }
 
 # COPIAR CUANDO CAMBIEMOS PARÁMETROS

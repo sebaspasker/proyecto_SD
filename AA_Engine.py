@@ -45,13 +45,13 @@ CHANGE = False
 WAIT_USER = True
 
 PRIVATE_KEY = None
+PUBLIC_KEY_CLI = None
 
 sys.path.append("src")
 sys.path.append("src/exceptions")
 
 players_dict = {}
 npc_dict = {}
-rsa_dict = {}
 
 ####### NEW UPDATE P3 #######
 def save_map_and_weather_json():
@@ -72,13 +72,14 @@ def save_dict_players_json():
 
 
 def exchange_keys(alias, connection):
-    global rsa_dict
+    global PUBLIC_KEY_CLI
 
     public_key_byte = bytearray(get_public_key_bytes(PRIVATE_KEY.public_key()))
     connection.send(public_key_byte)
 
-    public_key_cli = read_public_key_bytes(connection.recv(512))
-    rsa_dict[alias] = public_key_cli
+    public_key = connection.recv(512)
+    public_key_cli = read_public_key_bytes(public_key)
+    PUBLIC_KEY_CLI = public_key_cli
 
 
 #############################
@@ -318,7 +319,9 @@ def read_map(ddbb_server=None):
         print("{}".format(VE.message))
 
 
+@DeprecationWarning
 def recieve_map(server):
+    # No se usa en el programa
     """
     Recieves a map with kafka and saves it in map_rec.
     """
@@ -418,9 +421,21 @@ def send_server_active():
 
     while True:
         if WAIT_USER:
-            producer.send("server", "1,{}".format(str(time())).encode(FORMAT))
+            if PUBLIC_KEY_CLI is not None:
+                cyphertext = encrypt(
+                    PUBLIC_KEY_CLI, "1,{}".format(str(time())).encode(FORMAT)
+                )
+                producer.send("server", cyphertext)
+            else:
+                producer.send("server", "1,{}".format(str(time())).encode(FORMAT))
         else:
-            producer.send("server", "2,{}".format(str(time())).encode(FORMAT))
+            if PUBLIC_KEY_CLI is not None:
+                cyphertext = encrypt(
+                    PUBLIC_KEY_CLI, "2,{}".format(str(time())).encode(FORMAT)
+                )
+                producer.send("server", cyphertext)
+            else:
+                producer.send("server", "2,{}".format(str(time())).encode(FORMAT))
         sleep(1)
 
 
@@ -437,18 +452,21 @@ def send_weather(server=None):
             keys = list(weather.keys())
             producer.send(
                 "weather",
-                dict_sockets()["Weather"]
-                .format(
-                    city_1=keys[0],
-                    t_1=weather[keys[0]],
-                    city_2=keys[1],
-                    t_2=weather[keys[1]],
-                    city_3=keys[2],
-                    t_3=weather[keys[2]],
-                    city_4=keys[3],
-                    t_4=weather[keys[3]],
-                )
-                .encode(FORMAT),
+                Encrypt(
+                    PUBLIC_KEY_CLI,
+                    dict_sockets()["Weather"]
+                    .format(
+                        city_1=keys[0],
+                        t_1=weather[keys[0]],
+                        city_2=keys[1],
+                        t_2=weather[keys[1]],
+                        city_3=keys[2],
+                        t_3=weather[keys[2]],
+                        city_4=keys[3],
+                        t_4=weather[keys[3]],
+                    )
+                    .encode(FORMAT),
+                ),
             )
             sleep(1)
         except e:
@@ -841,7 +859,7 @@ def recieve_key_clients():
     print("[RECIEVING KEYS] Recieving keys from clients.")
     consumer = KafkaConsumer("keys", bootstrap_servers=KAFKA_SERVER)
     for msg in consumer:
-        msg_ = msg.value.decode(FORMAT).split(",")
+        msg_ = decrypt(PRIVATE_KEY, msg.value[-256:]).decode(FORMAT).split(",")
         alias = msg_[0]
         key = msg_[1]
         process_key_client(alias, key)
@@ -878,23 +896,27 @@ def send_dict_players():
     Send players to kafka producer by client.
     """
 
-    save_dict_players_json()
+    threading.Thread(target=save_dict_players_json, args=()).start()
     producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+
     while True:
         sleep(1)
         for key in players_dict.keys():
             player = players_dict[key]
             producer.send(
                 "player_{}".format(key[0].lower()),
-                dict_sockets()["Player"]
-                .format(
-                    alias=player.get_alias(),
-                    level=str(player.get_level()),
-                    hot=str(player.get_hot()),
-                    cold=str(player.get_cold()),
-                    dead=str(player.get_dead()),
-                )
-                .encode(FORMAT),
+                encrypt(
+                    PUBLIC_KEY_CLI,
+                    dict_sockets()["Player"]
+                    .format(
+                        alias=player.get_alias(),
+                        level=str(player.get_level()),
+                        hot=str(player.get_hot()),
+                        cold=str(player.get_cold()),
+                        dead=str(player.get_dead()),
+                    )
+                    .encode(FORMAT),
+                ),
             )
 
 
@@ -991,6 +1013,7 @@ def weather_socket():
         weather_data = requests.get(final_url).json()
         WEATHER_DICT[city] = round(float(weather_data["main"]["temp"]) - 273.0, 2)
     city_keys = list(WEATHER_DICT.keys())
+    print(city_keys)
     print(
         "[CONNECTED WEATHER] Cities choosen: {}({}), {}({}), {}({}), {}({})".format(
             city_keys[0],

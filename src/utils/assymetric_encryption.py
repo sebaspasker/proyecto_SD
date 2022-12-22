@@ -22,6 +22,7 @@ def get_private_key_bytes(private_key):
     """
     Get RSA private key in bytes.
     """
+
     return private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
@@ -33,6 +34,7 @@ def get_public_key_bytes(public_key):
     """
     Get RSA public key in bytes.
     """
+
     return public_key.public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
