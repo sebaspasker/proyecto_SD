@@ -598,7 +598,7 @@ def read_weather_cli():
     for msg in consumer:
         if PLAYER.get_dead() is True or SERVER_ON is False or GAME_END is True:
             break
-        msg_ = Decrypt(PRIVATE_KEY, msg.value).decode(FORMAT).split(",")
+        msg_ = decrypt(PRIVATE_KEY, msg.value).decode(FORMAT).split(",")
         weather = {}
         for i in range(1, 9, 2):
             weather[msg_[i]] = msg_[i + 1]
@@ -616,15 +616,26 @@ def read_map_cli():
         "map_engine", bootstrap_servers=KAFKA_SERVER, consumer_timeout_ms=3000
     )
 
+    decrypt_iterator = -1
+    msg_encr = []
     for message in kafka_consumer:
+        msg_encr.append(message.value)
+        decrypt_iterator += 1
         if PLAYER.get_dead() is True or SERVER_ON is False or GAME_END is True:
             break
-        MAP = Map(message.value.decode(FORMAT)[-400:])
-        if WEATHER is None:
-            MAP.set_none_influencial_weather()
-        else:
-            MAP.set_weather(WEATHER)
-        CHANGE = True
+        if decrypt_iterator == 3:
+            decrypt_iterator = -1
+            msg_decr = ""
+            for m in msg_encr:
+                msg_decr += decrypt(PRIVATE_KEY, m).decode(FORMAT)
+            # MAP = Map(message.value.decode(FORMAT)[-400:])
+            MAP = Map(msg_decr)
+            if WEATHER is None:
+                MAP.set_none_influencial_weather()
+            else:
+                MAP.set_weather(WEATHER)
+            CHANGE = True
+            msg_encr.clear()
 
 
 def send_move_cli():

@@ -404,7 +404,24 @@ def send_map(server=None):
     while True:
         wait_until_change()
         try:
-            producer.send("map_engine", MAP.to_raw_string().encode(FORMAT))
+
+            # producer.send("map_engine", MAP.to_raw_string().encode(FORMAT))
+            producer.send(
+                "map_engine",
+                encrypt(PUBLIC_KEY_CLI, MAP.to_raw_string()[0:100].encode(FORMAT)),
+            )
+            producer.send(
+                "map_engine",
+                encrypt(PUBLIC_KEY_CLI, MAP.to_raw_string()[100:200].encode(FORMAT)),
+            )
+            producer.send(
+                "map_engine",
+                encrypt(PUBLIC_KEY_CLI, MAP.to_raw_string()[200:300].encode(FORMAT)),
+            )
+            producer.send(
+                "map_engine",
+                encrypt(PUBLIC_KEY_CLI, MAP.to_raw_string()[300:400].encode(FORMAT)),
+            )
             CHANGE = False
         except ValueError as VE:
             print("VALUE ERROR: Cerrando engine...")
@@ -450,10 +467,28 @@ def send_weather(server=None):
         try:
             weather = MAP.get_weather()
             keys = list(weather.keys())
-            producer.send(
-                "weather",
-                Encrypt(
-                    PUBLIC_KEY_CLI,
+            if PUBLIC_KEY_CLI is not None:
+                producer.send(
+                    "weather",
+                    encrypt(
+                        PUBLIC_KEY_CLI,
+                        dict_sockets()["Weather"]
+                        .format(
+                            city_1=keys[0],
+                            t_1=weather[keys[0]],
+                            city_2=keys[1],
+                            t_2=weather[keys[1]],
+                            city_3=keys[2],
+                            t_3=weather[keys[2]],
+                            city_4=keys[3],
+                            t_4=weather[keys[3]],
+                        )
+                        .encode(FORMAT),
+                    ),
+                )
+            else:
+                producer.send(
+                    "weather",
                     dict_sockets()["Weather"]
                     .format(
                         city_1=keys[0],
@@ -466,8 +501,7 @@ def send_weather(server=None):
                         t_4=weather[keys[3]],
                     )
                     .encode(FORMAT),
-                ),
-            )
+                )
             sleep(1)
         except e:
             print(
