@@ -406,22 +406,32 @@ def send_map(server=None):
         try:
 
             # producer.send("map_engine", MAP.to_raw_string().encode(FORMAT))
-            producer.send(
-                "map_engine",
-                encrypt(PUBLIC_KEY_CLI, MAP.to_raw_string()[0:100].encode(FORMAT)),
-            )
-            producer.send(
-                "map_engine",
-                encrypt(PUBLIC_KEY_CLI, MAP.to_raw_string()[100:200].encode(FORMAT)),
-            )
-            producer.send(
-                "map_engine",
-                encrypt(PUBLIC_KEY_CLI, MAP.to_raw_string()[200:300].encode(FORMAT)),
-            )
-            producer.send(
-                "map_engine",
-                encrypt(PUBLIC_KEY_CLI, MAP.to_raw_string()[300:400].encode(FORMAT)),
-            )
+            if PUBLIC_KEY_CLI is not None:
+                producer.send(
+                    "map_engine",
+                    encrypt(PUBLIC_KEY_CLI, MAP.to_raw_string()[0:100].encode(FORMAT)),
+                )
+                producer.send(
+                    "map_engine",
+                    encrypt(
+                        PUBLIC_KEY_CLI, MAP.to_raw_string()[100:200].encode(FORMAT)
+                    ),
+                )
+                producer.send(
+                    "map_engine",
+                    encrypt(
+                        PUBLIC_KEY_CLI, MAP.to_raw_string()[200:300].encode(FORMAT)
+                    ),
+                )
+                producer.send(
+                    "map_engine",
+                    encrypt(
+                        PUBLIC_KEY_CLI, MAP.to_raw_string()[300:400].encode(FORMAT)
+                    ),
+                )
+            else:
+                producer.send("map_engine", "Not players detected.".encode(FORMAT))
+
             CHANGE = False
         except ValueError as VE:
             print("VALUE ERROR: Cerrando engine...")
