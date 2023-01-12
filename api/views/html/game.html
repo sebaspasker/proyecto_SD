@@ -5,38 +5,155 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<title> Game </title>
 		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+	<style>
+ #tabla {
+    border-collapse: collapse;
+    margin: 0 auto;
+  }
+  #tabla td {
+    border: 1px solid black;
+    width: 20px;
+    height: 20px;
+    text-align: center;
+    vertical-align: middle;
+    font-size: 16px;
+    color: white;
+    background-color: #333;
+  }
+  #tabla td:nth-child(odd) {
+    background-color: #666;
+  }
+  #tabla td:nth-child(even) {
+    background-color: #999;
+  }
+   #info-jugadores, #info-ciudades {
+    text-align: center;
+  }
+  #info-jugadores p, #info-ciudades p {
+    font-size: 18px;
+    color: #333;
+    margin: 10px 0;
+    border-radius: 10px;
+    padding: 10px 20px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+  }
+  #info-jugadores p:nth-child(odd) {
+    background-color: #666;
+  }
+  #info-jugadores p:nth-child(even) {
+    background-color: #999;
+  }
+  #info-jugadores p:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+  }
+	</style>
 	</head>
 	<body>
-		<div id="div_1"></div>
-		<table class="table"> 
-			<thead> 
-				<tr id="tr_col"> 
-				</tr> 
-			</thead> 
-			<tbody id="tbody_1"> 
-			</tbody> 
-		</table> 
-		<script>
-			fetch("https://localhost:8080/map").then((res) => {
-				res.json().then((data) => {
-					console.log(data)
-					document.getElementById("div_1").innerHTML = data.map
-					document.getElementById("tr_col").innerHTML = '<th scope="col"> </th>'
-					document.getElementById("tbody_1").innerHTML = ''
-					var x = 0
-					for (let i=0; i<20; i++) {
-						document.getElementById("tbody_1").innerHTML += `<tr id="tr_${i}"><th scope="row">${i}</th ></tr>`;
-						document.getElementById("tr_col").innerHTML += `<th scope="col">${i}</th>`;
-						for(let j=0; j<20; j++){
-								document.getElementById(`tr_${i}`).innerHTML += `<td>${data.map[x]}</td>`
-								x += 1
+	<table id="tabla">
+			<tbody></tbody>
+	</table>
+	<div id="info-jugadores"></div>
+	<div id="info-ciudades"></div>
+<script>
+// Iniciar actualización periódica
+intervalId = setInterval(getData, 100);
+
+	function stopUpdating() {
+			// Detener actualización periódica
+			clearInterval(intervalId);
+	}
+
+	function getData() {
+					// Crear objeto XMLHttpRequest
+					var xhr = new XMLHttpRequest();
+					var xhr_1 = new XMLHttpRequest();
+
+					// Abrir conexión con la API
+					xhr.open('GET', 'https://localhost:8080/map');
+					xhr_1.open('GET', 'https://localhost:8080/registry')
+					
+			xhr_1.onload = function() {
+					if(xhr_1.status === 200) {
+					var datos = JSON.parse(xhr_1.responseText)
+					let jugadores = datos
+					// let jugadores = [
+					//	{ alias: 'Sebas', level: 1, ec: 4, ef: 1, dead: 0, active: 1 },
+					//	{ alias: 'Jesus', level: 3, ec: 8, ef: 2, dead: 0, active: 1 },
+					//]	
+
+					console.log(`${jugadores}`)
+					let infoJugadores = document.querySelector('#info-jugadores')
+					infoJugadores.innerText = ""
+						for (var i in jugadores) {
+							// Crear elemento p con la información del jugador
+							let p = document.createElement('p')
+								p.innerText = `Alias: ${jugadores[i].alias}, LEVEL: ${jugadores[i].level}, EC: ${jugadores[i].ec}, EF: ${jugadores[i].ef}, Dead: ${jugadores[i].dead}`
+							// Añadir elemento p al elemento info-jugadores
+								infoJugadores.appendChild(p)
 						}
 					}
-				})
-			})
-		</script>
-		<script>
-		</script>
+				}
+
+					// Establecer función de callback para cuando se reciba la respuesta
+					xhr.onload = function() {
+
+					if (xhr.status === 200) {
+						// Procesar los datos de la respuesta
+						var datos = JSON.parse(xhr.responseText);
+
+						
+						var weather = datos.weather
+						let infoWeather = document.querySelector("#info-ciudades")
+						infoWeather.innerHTML = ''
+
+						for(var i in weather) {
+							let p = document.createElement('p')
+								p.innerText = `Ciudad: ${i}, Temperatura: ${weather[i]}`
+							infoWeather.appendChild(p)
+						}
+
+  // Referencia al elemento tbody de la tabla
+						let tbody = document.querySelector('#tabla tbody')
+						tbody.innerHTML = ""
+
+						// Contador de caracteres añadidos a la tabla
+						let count = 0
+
+						// Recorrer la cadena carácter a carácter
+						for (let i = 0; i < datos.map.length; i++) {
+							// Crear fila y celda cada 20 caracteres
+							if (count % 20 === 0) {
+								let tr = document.createElement('tr')
+								let td = document.createElement('td')
+								td.innerText = datos.map[i]
+								tr.appendChild(td)
+								tbody.appendChild(tr)
+							} else {
+								// Añadir carácter a la última fila
+								let td = document.createElement('td')
+								td.innerText = datos.map[i]
+								tbody.lastChild.appendChild(td)
+							}
+
+							// Incrementar contador
+							count++
+						}											
+																
+							} else {
+															console.error('Error al obtener los datos');
+													
+								}
+								
+					};
+
+						// Enviar solicitud
+										xhr_1.send();
+										xhr.send();
+								
+							}
+						</script>
 		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4" crossorigin="anonymous"></script>
 	</body>
 </html>

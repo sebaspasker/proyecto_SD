@@ -55,7 +55,7 @@ router.get('/', (req, res) => {
 		return
 	}
 
-	logger.info(`Process SUCCESS. Request to GET registry/. IP: ${req.socket.remoteAddress}`)
+	// logger.info(`Process SUCCESS. Request to GET registry/. IP: ${req.socket.remoteAddress}`)
 	res.status(200)
 	res.json(users)
 	return;
